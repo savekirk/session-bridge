@@ -9,15 +9,125 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "entire",
+          "title": "Entire",
+          "icon": "media/logo.svg"
+        }
+      ]
+    },
+    "views": {
+      "entire": [
+        {
+          "id": "entire.workspace",
+          "name": "Workspace",
+          "icon": "media/logo.png"
+        },
+        {
+          "id": "entire.activeSessions",
+          "name": "Active Sessions",
+          "icon": "media/dark/play.svg"
+        },
+        {
+          "id": "entire.checkpoints",
+          "name": "Checkpoints",
+          "icon": "media/dark/history.svg"
+        },
+        {
+          "id": "entire.recovery",
+          "name": "Recovery",
+          "icon": "media/dark/wrench.svg"
+        }
+      ]
+    },
     "commands": [
       {
-        "command": "session-bridge.helloWorld",
-        "title": "Hello World"
+        "command": "entire.showStatus",
+        "title": "Show Status",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.enable",
+        "title": "Enable In Repository",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.disable",
+        "title": "Disable In Repository",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.refresh",
+        "title": "Refresh",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.browseCheckpoints",
+        "title": "Browse Checkpoints",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.explainCheckpoint",
+        "title": "Explain Checkpoint",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.explainCommit",
+        "title": "Explain Commit",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.openRawTranscript",
+        "title": "Open Raw Transcript",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.rewindInteractive",
+        "title": "Rewind To Checkpoint",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.resumeBranch",
+        "title": "Resume Branch Session",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.runDoctor",
+        "title": "Run Doctor",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.clean",
+        "title": "Clean Entire State",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.reset",
+        "title": "Reset Entire Session Data",
+        "category": "Entire"
+      },
+      {
+        "command": "entire.showTrace",
+        "title": "Show Trace",
+        "category": "Entire"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "entire.refresh",
+          "when": "view =~ /^entire\\./",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" aria-hidden="true" role="img">
+  <title>Session Bridge</title>
+  <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="7" cy="6" r="2.4" stroke-width="1.6" />
+    <path d="M7 8.8v7.2" stroke-width="1.6" />
+
+    <circle cx="17" cy="6" r="1.7" stroke-width="1.5" />
+    <path d="M17 7.7v8.3" stroke-width="1.5" />
+    <path d="M15.5 4.8l-1.2-1.2M18.5 4.8l1.2-1.2M18.5 7.2l1.2 1.2" stroke-width="1.2" />
+
+    <circle cx="7" cy="11" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="11" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="7" cy="16" r="1.1" fill="currentColor" stroke="none" />
+    <circle cx="17" cy="16" r="1.1" fill="currentColor" stroke="none" />
+
+    <path d="M8.6 11h6.8" stroke-width="1.2" stroke-dasharray="1.8 1.8" />
+    <path d="M8.6 16h6.8" stroke-width="1.2" stroke-dasharray="1.8 1.8" />
+
+    <circle cx="12" cy="20" r="1.8" fill="currentColor" stroke="none" />
+    <path d="M8 16.2c1.1 1.2 2.3 2.5 4 3.8M16 16.2c-1.1 1.2-2.3 2.5-4 3.8" stroke-width="1.4" />
+  </g>
+</svg>

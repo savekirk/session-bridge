@@ -6,8 +6,18 @@
   "checkpoints_count": 1,
   "files_touched": [
     ".gitignore",
+    "media/dark/history.svg",
+    "media/dark/play.svg",
+    "media/dark/wrench.svg",
+    "media/light/history.svg",
+    "media/light/play.svg",
+    "media/light/wrench.svg",
+    "media/logo.svg",
     "package.json",
-    "src/extension.ts"
+    "src/EntireCommand.ts",
+    "src/entireBinaryResolver.ts",
+    "src/extension.ts",
+    "src/runCommand.ts"
   ],
   "sessions": [
     {
@@ -15,6 +25,12 @@
       "transcript": "/29/dbfeaf9083/0/full.jsonl",
       "content_hash": "/29/dbfeaf9083/0/content_hash.txt",
       "prompt": "/29/dbfeaf9083/0/prompt.txt"
+    },
+    {
+      "metadata": "/29/dbfeaf9083/1/metadata.json",
+      "transcript": "/29/dbfeaf9083/1/full.jsonl",
+      "content_hash": "/29/dbfeaf9083/1/content_hash.txt",
+      "prompt": ""
     }
   ],
   "token_usage": {

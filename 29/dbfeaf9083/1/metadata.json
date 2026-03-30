@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.5.2",
+  "checkpoint_id": "29dbfeaf9083",
+  "session_id": "ses_2bef27598ffe7m6Lx2BIiN92bh",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-30T23:40:33.100735Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/extension.ts",
+    ".gitignore",
+    "media/dark/play.svg",
+    "media/light/wrench.svg",
+    "media/logo.svg",
+    "src/runCommand.ts",
+    "media/dark/history.svg",
+    "media/dark/wrench.svg",
+    "media/light/history.svg",
+    "media/light/play.svg",
+    "package.json",
+    "src/EntireCommand.ts",
+    "src/entireBinaryResolver.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "claude-opus-4.6",
+  "turn_id": "3b28e584dd81",
+  "initial_attribution": {
+    "calculated_at": "2026-03-30T23:40:33.099949Z",
+    "agent_lines": 382,
+    "human_added": 106,
+    "human_modified": 19,
+    "human_removed": 0,
+    "total_committed": 507,
+    "agent_percentage": 75.34516765285996
+  }
+}

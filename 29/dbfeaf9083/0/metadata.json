@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.5.2",
+  "checkpoint_id": "29dbfeaf9083",
+  "session_id": "ses_2bef25635ffe8EzID0I1Oeymal",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-30T23:40:28.279994Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "package.json",
+    "src/extension.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "claude-opus-4.6",
+  "turn_id": "52ada93e0c64",
+  "token_usage": {
+    "input_tokens": 22675,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 4953,
+    "output_tokens": 3133,
+    "api_call_count": 3
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-03-30T23:40:28.257007Z",
+    "agent_lines": 0,
+    "human_added": 484,
+    "human_modified": 25,
+    "human_removed": 0,
+    "total_committed": 484,
+    "agent_percentage": 0
+  }
+}

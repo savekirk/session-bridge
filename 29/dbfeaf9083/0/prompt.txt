@@ -1,0 +1,7 @@
+Quickly explore the codebase at /Users/savekirk/dev/ai/entire/session-bridge to understand:
+1. How `runCommand` is used across the codebase (search for imports/calls of runCommand)
+2. How `resolveEntireBinary` is used across the codebase
+3. What the project is (check package.json, tsconfig, etc.)
+4. Are there any tests for these files?
+
+Return all findings including file paths and relevant code snippets.

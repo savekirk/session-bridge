@@ -26,22 +26,22 @@
     "views": {
       "entire": [
         {
-          "id": "entire.workspace",
+          "id": "session.bridge.entire.workspace",
           "name": "Workspace",
           "icon": "media/logo.png"
         },
         {
-          "id": "entire.activeSessions",
+          "id": "session.bridge.entire.activeSessions",
           "name": "Active Sessions",
           "icon": "media/dark/play.svg"
         },
         {
-          "id": "entire.checkpoints",
+          "id": "session.bridge.entire.checkpoints",
           "name": "Checkpoints",
           "icon": "media/dark/history.svg"
         },
         {
-          "id": "entire.recovery",
+          "id": "session.bridge.entire.recovery",
           "name": "Recovery",
           "icon": "media/dark/wrench.svg"
         }
@@ -49,81 +49,81 @@
     },
     "commands": [
       {
-        "command": "entire.showStatus",
-        "title": "Show Status",
+        "command": "session.bridge.entire.showStatus",
+        "title": "Session Bridge: (Entire) Show Status",
         "category": "Entire"
       },
       {
-        "command": "entire.enable",
-        "title": "Enable In Repository",
+        "command": "session.bridge.entire.enable",
+        "title": "Session Bridge: (Entire) Enable In Repository",
         "category": "Entire"
       },
       {
-        "command": "entire.disable",
-        "title": "Disable In Repository",
+        "command": "session.bridge.entire.disable",
+        "title": "Session Bridge: (Entire) Disable In Repository",
         "category": "Entire"
       },
       {
-        "command": "entire.refresh",
-        "title": "Refresh",
+        "command": "session.bridge.entire.refresh",
+        "title": "Session Bridge: (Entire) Refresh",
         "category": "Entire"
       },
       {
-        "command": "entire.browseCheckpoints",
-        "title": "Browse Checkpoints",
+        "command": "session.bridge.entire.browseCheckpoints",
+        "title": "Session Bridge: (Entire) Browse Checkpoints",
         "category": "Entire"
       },
       {
-        "command": "entire.explainCheckpoint",
-        "title": "Explain Checkpoint",
+        "command": "session.bridge.entire.explainCheckpoint",
+        "title": "Session Bridge: (Entire) Explain Checkpoint",
         "category": "Entire"
       },
       {
-        "command": "entire.explainCommit",
-        "title": "Explain Commit",
+        "command": "session.bridge.entire.explainCommit",
+        "title": "Session Bridge: (Entire) Explain Commit",
         "category": "Entire"
       },
       {
-        "command": "entire.openRawTranscript",
-        "title": "Open Raw Transcript",
+        "command": "session.bridge.entire.openRawTranscript",
+        "title": "Session Bridge: (Entire) Open Raw Transcript",
         "category": "Entire"
       },
       {
-        "command": "entire.rewindInteractive",
-        "title": "Rewind To Checkpoint",
+        "command": "session.bridge.entire.rewindInteractive",
+        "title": "Session Bridge: (Entire) Rewind To Checkpoint",
         "category": "Entire"
       },
       {
-        "command": "entire.resumeBranch",
-        "title": "Resume Branch Session",
+        "command": "session.bridge.entire.resumeBranch",
+        "title": "Session Bridge: (Entire) Resume Branch Session",
         "category": "Entire"
       },
       {
-        "command": "entire.runDoctor",
-        "title": "Run Doctor",
+        "command": "session.bridge.entire.runDoctor",
+        "title": "Session Bridge: (Entire) Run Doctor",
         "category": "Entire"
       },
       {
-        "command": "entire.clean",
-        "title": "Clean Entire State",
+        "command": "session.bridge.entire.clean",
+        "title": "Session Bridge: (Entire) Clean Entire State",
         "category": "Entire"
       },
       {
-        "command": "entire.reset",
-        "title": "Reset Entire Session Data",
+        "command": "session.bridge.entire.reset",
+        "title": "Session Bridge: (Entire) Reset Entire Session Data",
         "category": "Entire"
       },
       {
-        "command": "entire.showTrace",
-        "title": "Show Trace",
+        "command": "session.bridge.entire.showTrace",
+        "title": "Session Bridge: (Entire) Show Trace",
         "category": "Entire"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "entire.refresh",
-          "when": "view =~ /^entire\\./",
+          "command": "session.bridge.entire.refresh",
+          "when": "view =~ /^session\\.bridge\\.entire\\./",
           "group": "navigation"
         }
       ]

@@ -1,47 +1,63 @@
 import * as vscode from 'vscode';
-import { isEntireBinary, resolveEntireBinary } from './EntireBinaryResolver';
+import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
 
-const ENTIRE_OUTPUT_CHANNEL = 'Entire';
-const ENTIRE_CONTAINER_ID = 'entire';
+const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
+const ENTIRE_CONTAINER_ID = 'session-bridge';
+const enum COMMAND_ID {
+	SHOW_STATUS = "session.bridge.entire.showStatus",
+	ENABLE = "session.bridge.entire.enable",
+	DISABLE = "session.bridge.entire.disable",
+	REFRESH = "session.bridge.entire.refresh",
+	BROWSE_CHECKPOINTS = "session.bridge.entire.browseCheckpoints",
+	EXPLAIN_CHECKPOINT = "session.bridge.entire.explainCheckpoint",
+	EXPLAIN_COMMIT = "session.bridge.entire.explainCommit",
+	OPEN_RAW_TRANSCRIPT = "session.bridge.entire.openRawTranscript",
+	REWIND_INTERACTIVE = "session.bridge.entire.rewindInteractive",
+	RESUME_BRANCH = "session.bridge.entire.resumeBranch",
+	RUN_DOCTOR = "session.bridge.entire.runDoctor",
+	CLEAN = "session.bridge.entire.clean",
+	RESET = "session.bridge.entire.reset",
+	SHOW_TRACE = "session.bridge.entire.showTrace"
+}
 
 const VIEW_DEFINITIONS = [
 	{
-		id: 'entire.workspace',
+		id: 'session.bridge.entire.workspace',
 		label: 'Workspace',
 		description: 'Workspace and Entire CLI status will appear here.'
 	},
 	{
-		id: 'entire.activeSessions',
+		id: 'session.bridge.entire.activeSessions',
 		label: 'Active Sessions',
 		description: 'Active Entire sessions will appear here.'
 	},
 	{
-		id: 'entire.checkpoints',
+		id: 'session.bridge.entire.checkpoints',
 		label: 'Checkpoints',
 		description: 'Rewindable checkpoints will appear here.'
 	},
 	{
-		id: 'entire.recovery',
+		id: 'session.bridge.entire.recovery',
 		label: 'Recovery',
 		description: 'Recovery and maintenance actions will appear here.'
 	}
 ] as const;
 
-const COMMAND_TITLES: Record<string, string> = {
-	'entire.showStatus': 'Entire: Show Status',
-	'entire.enable': 'Entire: Enable In Repository',
-	'entire.disable': 'Entire: Disable In Repository',
-	'entire.refresh': 'Entire: Refresh',
-	'entire.browseCheckpoints': 'Entire: Browse Checkpoints',
-	'entire.explainCheckpoint': 'Entire: Explain Checkpoint',
-	'entire.explainCommit': 'Entire: Explain Commit',
-	'entire.openRawTranscript': 'Entire: Open Raw Transcript',
-	'entire.rewindInteractive': 'Entire: Rewind To Checkpoint',
-	'entire.resumeBranch': 'Entire: Resume Branch Session',
-	'entire.runDoctor': 'Entire: Run Doctor',
-	'entire.clean': 'Entire: Clean Entire State',
-	'entire.reset': 'Entire: Reset Entire Session Data',
-	'entire.showTrace': 'Entire: Show Trace'
+const COMMAND_TITLES: Record<COMMAND_ID, string> = {
+	[COMMAND_ID.SHOW_STATUS]: 'Session Bridge: (Entire) Show Status',
+	[COMMAND_ID.ENABLE]: 'Session Bridge: (Entire) Enable In Repository',
+	[COMMAND_ID.DISABLE]: 'Session Bridge: (Entire) Disable In Repository',
+	[COMMAND_ID.REFRESH]: 'Session Bridge: (Entire) Refresh',
+	[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Session Bridge: (Entire) Browse Checkpoints',
+	[COMMAND_ID.EXPLAIN_CHECKPOINT]: 'Session Bridge: (Entire) Explain Checkpoint',
+	[COMMAND_ID.EXPLAIN_COMMIT]: 'Session Bridge: (Entire) Explain Commit',
+	[COMMAND_ID.OPEN_RAW_TRANSCRIPT]: 'Session Bridge: (Entire) Open Raw Transcript',
+	[COMMAND_ID.REWIND_INTERACTIVE]: 'Session Bridge: (Entire) Rewind To Checkpoint',
+	[COMMAND_ID.RESUME_BRANCH]: 'Session Bridge: (Entire) Resume Branch Session',
+	[COMMAND_ID.RUN_DOCTOR]: 'Session Bridge: (Entire) Run Doctor',
+	[COMMAND_ID.CLEAN]: 'Session Bridge: (Entire) Clean Entire State',
+	[COMMAND_ID.RESET]: 'Session Bridge: (Entire) Reset Entire Session Data',
+	[COMMAND_ID.SHOW_TRACE]: 'Session Bridge: (Entire) Show Trace'
 };
 
 class PlaceholderTreeItem extends vscode.TreeItem {
@@ -87,25 +103,25 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 
 	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	statusBarItem.name = 'Entire Status';
+	statusBarItem.name = 'Session Bridge Status';
 	statusBarItem.text = '$(link) Entire';
-	statusBarItem.tooltip = 'Entire extension is active';
-	statusBarItem.command = 'entire.showStatus';
+	statusBarItem.tooltip = 'Session Bridge for Entire extension is active';
+	statusBarItem.command = COMMAND_ID.SHOW_STATUS;
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
 
-	const appendCommandRun = (commandId: string) => {
+	const appendCommandRun = (commandId: COMMAND_ID) => {
 		outputChannel.appendLine(`[command] ${COMMAND_TITLES[commandId] ?? commandId}`);
 	};
 
-	const showPlaceholder = async (commandId: string, message?: string) => {
+	const showPlaceholder = async (commandId: COMMAND_ID, message?: string) => {
 		appendCommandRun(commandId);
 		outputChannel.show(true);
 		await vscode.window.showInformationMessage(message ?? `${COMMAND_TITLES[commandId]} is not implemented yet.`);
 	};
 
 	const showStatus = async () => {
-		appendCommandRun("entire.showStatus");
+		appendCommandRun(COMMAND_ID.SHOW_STATUS);
 		outputChannel.show(true);
 		try {
 			const resolved = await resolveEntireBinary();
@@ -121,22 +137,22 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	};
 
-	for (const commandId of Object.keys(COMMAND_TITLES)) {
+	for (const commandId of Object.keys(COMMAND_TITLES) as COMMAND_ID[]) {
 		const disposable = vscode.commands.registerCommand(commandId, async () => {
 			switch (commandId) {
-				case 'entire.refresh':
+				case COMMAND_ID.REFRESH:
 					for (const provider of viewProviders.values()) {
 						provider.refresh();
 					}
 					appendCommandRun(commandId);
-					await vscode.window.showInformationMessage('Entire views refreshed.');
+					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
 					return;
-				case 'entire.browseCheckpoints':
+				case COMMAND_ID.BROWSE_CHECKPOINTS:
 					appendCommandRun(commandId);
-					await vscode.commands.executeCommand('entire.checkpoints.focus');
+					await vscode.commands.executeCommand('session.bridge.entire.checkpoints.focus');
 					return;
-				case 'entire.explainCheckpoint':
-				case 'entire.explainCommit': {
+				case COMMAND_ID.EXPLAIN_CHECKPOINT:
+				case COMMAND_ID.EXPLAIN_COMMIT: {
 					appendCommandRun(commandId);
 					const panel = vscode.window.createWebviewPanel(
 						'entireExplain',
@@ -147,7 +163,7 @@ export function activate(context: vscode.ExtensionContext) {
 					panel.webview.html = renderPlaceholderExplainHtml(COMMAND_TITLES[commandId]);
 					return;
 				}
-				case 'entire.openRawTranscript': {
+				case COMMAND_ID.OPEN_RAW_TRANSCRIPT: {
 					appendCommandRun(commandId);
 					const document = await vscode.workspace.openTextDocument({
 						language: 'text',
@@ -156,8 +172,9 @@ export function activate(context: vscode.ExtensionContext) {
 					await vscode.window.showTextDocument(document, { preview: false });
 					return;
 				}
-				case "entire.showStatus": {
+				case COMMAND_ID.SHOW_STATUS: {
 					await showStatus();
+					break;
 				}
 				default:
 					await showPlaceholder(commandId);

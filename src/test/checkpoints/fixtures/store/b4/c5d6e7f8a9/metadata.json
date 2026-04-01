@@ -1,0 +1,18 @@
+{
+  "checkpoint_id": "b4c5d6e7f8a9",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/parser.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/b4/c5d6e7f8a9/0/metadata.json",
+      "transcript": "/b4/c5d6e7f8a9/0/missing.jsonl",
+      "context": "/b4/c5d6e7f8a9/0/context.md",
+      "content_hash": "/b4/c5d6e7f8a9/0/content_hash.txt",
+      "prompt": "/b4/c5d6e7f8a9/0/missing-prompt.txt"
+    }
+  ]
+}

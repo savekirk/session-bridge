@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Ordering midpoint checkpoint"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Ordering checkpoint recorded"}]}}

@@ -3,9 +3,11 @@ import * as cp from "child_process";
 export interface CommandInput {
   command: string;
   args?: string[];
+  cwd?: string;
   onSuccess: (data: string) => void;
   onError: (error: string) => void;
   onExit: (code: number | null) => void;
+  onSpawnError?: (error: Error) => void;
 }
 
 
@@ -16,8 +18,8 @@ export interface CommandInput {
  * 
  * @returns {cp.ChildProcessWithoutNullStreams} - The spawn child process
  */
-export const runCommand = ({ command, args = [], onSuccess, onError, onExit }: CommandInput): cp.ChildProcessWithoutNullStreams => {
-  const child = cp.spawn(command, args);
+export const runCommand = ({ command, args = [], cwd, onSuccess, onError, onExit, onSpawnError }: CommandInput): cp.ChildProcessWithoutNullStreams => {
+  const child = cp.spawn(command, args, { cwd });
 
   child.stdout.on('data', (data: Buffer) => {
     onSuccess(data.toString());
@@ -29,6 +31,10 @@ export const runCommand = ({ command, args = [], onSuccess, onError, onExit }: C
 
   child.on('close', (code) => {
     onExit(code);
+  });
+
+  child.on('error', (error) => {
+    onSpawnError?.(error);
   });
 
   return child;
@@ -46,17 +52,29 @@ export interface CommandResult {
  *
  * @param command - The command to execute
  * @param args - Optional arguments to pass to the command
+ * @param cwd - Optional working directory for the command
  *
  * @returns The accumulated stdout, stderr, and exit code
  */
-export async function runCommandAsync(command: string, args: string[] = []): Promise<CommandResult> {
+export async function runCommandAsync(command: string, args: string[] = [], cwd?: string): Promise<CommandResult> {
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
+    let settled = false;
+
+    const finish = (exitCode: number | null) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      resolve({ stdout, stderr, exitCode });
+    };
 
     runCommand({
       command,
       args,
+      cwd,
       onSuccess(data) {
         stdout += data;
       },
@@ -64,7 +82,11 @@ export async function runCommandAsync(command: string, args: string[] = []): Pro
         stderr += data;
       },
       onExit(code) {
-        resolve({ stdout, stderr, exitCode: code });
+        finish(code);
+      },
+      onSpawnError(error) {
+        stderr += error.message;
+        finish(-1);
       },
     });
   });

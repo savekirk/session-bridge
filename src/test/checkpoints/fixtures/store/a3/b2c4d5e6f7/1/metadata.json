@@ -1,0 +1,19 @@
+{
+  "checkpoint_id": "a3b2c4d5e6f7",
+  "session_id": "2026-03-30-beta",
+  "strategy": "manual-commit",
+  "created_at": "2026-03-30T11:00:00Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "README.md"
+  ],
+  "agent": "Cursor",
+  "model": "cursor-sonnet",
+  "is_task": true,
+  "tool_use_id": "toolu_review",
+  "session_metrics": {
+    "duration_ms": 120000,
+    "turn_count": 2
+  }
+}

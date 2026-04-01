@@ -1,0 +1,18 @@
+{
+  "checkpoint_id": "d7e8f9a0b1c2",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/ordering.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/d7/e8f9a0b1c2/0/metadata.json",
+      "transcript": "/d7/e8f9a0b1c2/0/full.jsonl",
+      "content_hash": "/d7/e8f9a0b1c2/0/content_hash.txt",
+      "prompt": "/d7/e8f9a0b1c2/0/prompt.txt"
+    }
+  ],
+  "cli_version": "0.5.2"
+}

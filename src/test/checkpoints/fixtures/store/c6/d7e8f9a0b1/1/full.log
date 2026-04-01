@@ -1,0 +1,2 @@
+{"type":"user","message":{"role":"user","content":"Review the legacy log transcript"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Legacy log review complete"}]}}

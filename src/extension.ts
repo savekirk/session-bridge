@@ -222,7 +222,7 @@ function renderPlaceholderExplainHtml(title: string): string {
 </head>
 <body>
   <h1>${escapedTitle}</h1>
-  <p>This placeholder panel reserves the explain surface required by the technical PRD. CLI-backed explain rendering can be wired in next.</p>
+  <p>This is a placeholder panel . CLI-backed explain rendering can be wired in next.</p>
 </body>
 </html>`;
 }

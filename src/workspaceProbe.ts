@@ -1,13 +1,18 @@
-import * as fs from "fs";
-import * as path from "path";
-import { EntireBinary, isEntireBinary, isEntireResolveError, resolveEntireBinary } from "./entireBinaryResolver";
+import { tryExecGit } from "./checkpoints/util";
+import { EntireBinary, isEntireResolveError, resolveEntireBinary } from "./entireBinaryResolver";
+import { EntireSettings, getEntireSettingsPaths, resolveEntireSettings } from "./entireSettings";
 import { runCommandAsync } from "./runCommand";
 
+export const enum EntireStatusState {
+  ENABLED,
+  CLI_MISSING,
+  NOT_GIT_REPO,
+  DISABLED,
+}
 export interface EntireWorkspaceState {
-  binary: EntireBinary;
-  isGitRepo: boolean;
-  enabled?: boolean;
-  settingsPaths: string[];
+  state: EntireStatusState,
+  binary?: EntireBinary;
+  settings?: EntireSettings;
   warnings: string[];
   activeSessions: EntireSessionSummary[];
 }
@@ -27,41 +32,20 @@ export interface EntireSessionSummary {
 /**
  * Checks if the specified directory (or current directory) is inside a git-managed worktree.
  * 
- * @param cwd - Optional working directory to check
+ * @param repoPath - working directory to check
  * @returns - Resolves to true if it is a git repository, false otherwise.
  */
-async function isGitRepo(cwd?: string): Promise<boolean> {
-  try {
-    const { exitCode } = await runCommandAsync("git", ["rev-parse", "--is-inside-work-tree"], cwd);
-    return exitCode === 0;
-  } catch (error) {
-    return false;
+async function isGitRepo(repoPath: string): Promise<boolean> {
+  const result = await tryExecGit(repoPath, ["rev-parse", "--is-inside-work-tree"]);
+  if (result !== null) {
+    return true;
   }
+
+  return false;
 }
 
-/**
- * Checks and loads entire settings paths in the specified (or current) directory. 
- * Entire settings have the format `.entire/settings*.json`
- * 
- * @param cwd - Optional working directory to check
- * @returns - Resolves to an array of absolute paths to settings files.
- */
-async function getEntireSettingsPaths(cwd?: string): Promise<string[]> {
-  const root = cwd ?? process.cwd();
-  const entireDir = path.resolve(root, ".entire");
-
-  try {
-    const files = await fs.promises.readdir(entireDir);
-    return files
-      .filter((file) => file.startsWith("settings") && file.endsWith(".json"))
-      .map((file) => path.join(entireDir, file));
-  } catch (error) {
-    return [];
-  }
-}
-
-async function isEntireEnabled(): Promise<boolean> {
-  const { stdout, exitCode } = await runCommandAsync("entire", ["status"]);
+async function isEntireEnabled(cwd?: string): Promise<boolean> {
+  const { stdout, exitCode } = await runCommandAsync("entire", ["status"], cwd);
   if (exitCode !== 0) {
     return false;
   }
@@ -73,32 +57,48 @@ async function isEntireEnabled(): Promise<boolean> {
   return false;
 }
 
-export async function probeEntireWorkspace(): Promise<EntireWorkspaceState> {
+export async function probeEntireWorkspace(cwd: string | undefined): Promise<EntireWorkspaceState> {
   try {
+    var workspaceState: EntireWorkspaceState = {
+      state: EntireStatusState.DISABLED,
+      warnings: [],
+      activeSessions: [],
+    };
+
     const warnings: string[] = [];
     const resolved = await resolveEntireBinary();
     if (isEntireResolveError(resolved)) {
-      throw Error(resolved.message);
+      workspaceState.state = EntireStatusState.CLI_MISSING;
+      warnings.push(resolved.message);
+      workspaceState.warnings = warnings;
+
+      return workspaceState;
     }
 
-    const gitStatus = await isGitRepo();
-    const settings = await getEntireSettingsPaths();
-    let enabled: boolean | undefined;
+    const gitStatus = cwd !== undefined && await isGitRepo(cwd);
+    if (!gitStatus) {
+      workspaceState.state = EntireStatusState.NOT_GIT_REPO;
 
-    if (settings.length === 0) {
+      return workspaceState;
+    }
+
+    let settings = await resolveEntireSettings(cwd);
+
+    if (settings.settingsPaths.length === 0) {
       warnings.push("No Entire settings file found.");
       // fallback to entire status command
-      enabled = await isEntireEnabled();
+      settings.enabled = await isEntireEnabled(cwd);
+    }
+    workspaceState.settings = settings;
+
+    if (settings.enabled) {
+      workspaceState.state = EntireStatusState.ENABLED;
     }
 
-    return {
-      binary: resolved,
-      isGitRepo: gitStatus,
-      enabled,
-      settingsPaths: settings,
-      warnings,
-      activeSessions: [],
-    };
+    workspaceState.binary = resolved;
+    workspaceState.warnings = warnings;
+
+    return workspaceState;
   } catch (error) {
     throw error;
   }

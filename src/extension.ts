@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
+import { probeEntireWorkspace } from './workspaceProbe';
+import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
@@ -91,7 +93,11 @@ class PlaceholderTreeDataProvider implements vscode.TreeDataProvider<Placeholder
 	}
 }
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+	if (!vscode.workspace.workspaceFolders?.length) {
+		return;
+	}
+
 	const outputChannel = vscode.window.createOutputChannel(ENTIRE_OUTPUT_CHANNEL);
 	context.subscriptions.push(outputChannel);
 
@@ -102,11 +108,8 @@ export function activate(context: vscode.ExtensionContext) {
 		context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, provider));
 	}
 
-	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-	statusBarItem.name = 'Session Bridge Status';
-	statusBarItem.text = '$(link) Entire';
-	statusBarItem.tooltip = 'Session Bridge for Entire extension is active';
-	statusBarItem.command = COMMAND_ID.SHOW_STATUS;
+	let workspaceState = await probeEntireWorkspace(getProbeTargetPath());
+	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
 	statusBarItem.show();
 	context.subscriptions.push(statusBarItem);
 
@@ -125,7 +128,6 @@ export function activate(context: vscode.ExtensionContext) {
 		outputChannel.show(true);
 		try {
 			const resolved = await resolveEntireBinary();
-			console.log(resolved);
 			if (isEntireBinary(resolved)) {
 				await vscode.window.showInformationMessage(resolved.raw);
 			} else {
@@ -137,10 +139,40 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	};
 
+	const refreshWorkspaceProbe = async (reason: string) => {
+		const cwd = getProbeTargetPath();
+		workspaceState = await probeEntireWorkspace(cwd);
+		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
+
+		if (cwd) {
+			outputChannel.appendLine(`[probe] ${reason}: ${cwd}`);
+			return;
+		}
+
+		outputChannel.appendLine(`[probe] ${reason}: no file-backed workspace target`);
+	};
+
+	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(async (editor) => {
+		if (!isFileBackedEditor(editor)) {
+			return;
+		}
+
+		await refreshWorkspaceProbe('active editor changed');
+	}));
+
+	context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(async (document) => {
+		if (document.uri.scheme !== 'file') {
+			return;
+		}
+
+		await refreshWorkspaceProbe('file opened');
+	}));
+
 	for (const commandId of Object.keys(COMMAND_TITLES) as COMMAND_ID[]) {
 		const disposable = vscode.commands.registerCommand(commandId, async () => {
 			switch (commandId) {
 				case COMMAND_ID.REFRESH:
+					await refreshWorkspaceProbe('manual refresh');
 					for (const provider of viewProviders.values()) {
 						provider.refresh();
 					}
@@ -234,4 +266,22 @@ function escapeHtml(value: string): string {
 		.replaceAll('>', '&gt;')
 		.replaceAll('"', '&quot;')
 		.replaceAll("'", '&#39;');
+}
+
+function getProbeTargetPath(): string | undefined {
+	const activeEditor = vscode.window.activeTextEditor;
+	if (isFileBackedEditor(activeEditor)) {
+		return getWorkspaceFolderPath(activeEditor.document.uri) ?? activeEditor.document.uri.fsPath;
+	}
+
+	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+	return workspaceFolder?.uri.fsPath;
+}
+
+function getWorkspaceFolderPath(uri: vscode.Uri): string | undefined {
+	return vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
+}
+
+function isFileBackedEditor(editor: vscode.TextEditor | undefined): editor is vscode.TextEditor {
+	return editor?.document.uri.scheme === 'file';
 }

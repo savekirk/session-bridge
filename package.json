@@ -17,14 +17,14 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "entire",
-          "title": "Entire",
+          "id": "session-bridge",
+          "title": "Session Bridge for Entire",
           "icon": "media/logo.svg"
         }
       ]
     },
     "views": {
-      "entire": [
+      "session-bridge": [
         {
           "id": "session.bridge.entire.workspace",
           "name": "Workspace",
@@ -47,76 +47,98 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "session.bridge.entire.workspace",
+        "when": "gitOpenRepositoryCount == 0",
+        "contents": "Entire is a new developer platform that hooks into your Git workflow to capture AI agent sessions on every push, unifying your code with its context and reasoning.\n[Open Folder](command:vscode.openFolder)\n[Read the entire documentation here](https://docs.entire.io) to learn more."
+      },
+      {
+        "view": "session.bridge.entire.activeSessions",
+        "when": "gitOpenRepositoryCount == 0",
+        "contents": "Active sessions appear here after you open a Git repository and Entire is enabled."
+      },
+      {
+        "view": "session.bridge.entire.checkpoints",
+        "when": "gitOpenRepositoryCount == 0",
+        "contents": "Checkpoints appear here after you open a Git repository and Entire is enabled."
+      },
+      {
+        "view": "session.bridge.entire.recovery",
+        "when": "gitOpenRepositoryCount == 0",
+        "contents": "Recovery actions become available here after you open a Git repository and Entire is enabled."
+      }
+    ],
     "commands": [
       {
         "command": "session.bridge.entire.showStatus",
-        "title": "Session Bridge: (Entire) Show Status",
-        "category": "Entire"
+        "title": "Show Status",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.enable",
-        "title": "Session Bridge: (Entire) Enable In Repository",
-        "category": "Entire"
+        "title": "Enable In Repository",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.disable",
-        "title": "Session Bridge: (Entire) Disable In Repository",
-        "category": "Entire"
+        "title": "Disable In Repository",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.refresh",
-        "title": "Session Bridge: (Entire) Refresh",
-        "category": "Entire"
+        "title": "Refresh",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.browseCheckpoints",
-        "title": "Session Bridge: (Entire) Browse Checkpoints",
-        "category": "Entire"
+        "title": "Browse Checkpoints",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.explainCheckpoint",
-        "title": "Session Bridge: (Entire) Explain Checkpoint",
-        "category": "Entire"
+        "title": "Explain Checkpoint",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.explainCommit",
-        "title": "Session Bridge: (Entire) Explain Commit",
-        "category": "Entire"
+        "title": "Explain Commit",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.openRawTranscript",
-        "title": "Session Bridge: (Entire) Open Raw Transcript",
-        "category": "Entire"
+        "title": "Open Raw Transcript",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.rewindInteractive",
-        "title": "Session Bridge: (Entire) Rewind To Checkpoint",
-        "category": "Entire"
+        "title": "Rewind To Checkpoint",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.resumeBranch",
-        "title": "Session Bridge: (Entire) Resume Branch Session",
-        "category": "Entire"
+        "title": "Resume Branch Session",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.runDoctor",
-        "title": "Session Bridge: (Entire) Run Doctor",
-        "category": "Entire"
+        "title": "Run Doctor",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.clean",
-        "title": "Session Bridge: (Entire) Clean Entire State",
-        "category": "Entire"
+        "title": "Clean Entire State",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.reset",
-        "title": "Session Bridge: (Entire) Reset Entire Session Data",
-        "category": "Entire"
+        "title": "Reset Entire Session Data",
+        "category": "Session Bridge (Entire)"
       },
       {
         "command": "session.bridge.entire.showTrace",
-        "title": "Session Bridge: (Entire) Show Trace",
-        "category": "Entire"
+        "title": "Show Trace",
+        "category": "Session Bridge (Entire)"
       }
     ],
     "menus": {

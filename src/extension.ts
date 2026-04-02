@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
 import { probeEntireWorkspace } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
+import { EmptyViewCommands, EmptyViewKind, EmptyViewProvider } from './components/emptyViews';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
@@ -26,92 +27,65 @@ const VIEW_DEFINITIONS = [
 	{
 		id: 'session.bridge.entire.workspace',
 		label: 'Workspace',
-		description: 'Workspace and Entire CLI status will appear here.'
 	},
 	{
 		id: 'session.bridge.entire.activeSessions',
 		label: 'Active Sessions',
-		description: 'Active Entire sessions will appear here.'
 	},
 	{
 		id: 'session.bridge.entire.checkpoints',
 		label: 'Checkpoints',
-		description: 'Rewindable checkpoints will appear here.'
 	},
 	{
 		id: 'session.bridge.entire.recovery',
 		label: 'Recovery',
-		description: 'Recovery and maintenance actions will appear here.'
 	}
 ] as const;
 
 const COMMAND_TITLES: Record<COMMAND_ID, string> = {
-	[COMMAND_ID.SHOW_STATUS]: 'Session Bridge: (Entire) Show Status',
-	[COMMAND_ID.ENABLE]: 'Session Bridge: (Entire) Enable In Repository',
-	[COMMAND_ID.DISABLE]: 'Session Bridge: (Entire) Disable In Repository',
-	[COMMAND_ID.REFRESH]: 'Session Bridge: (Entire) Refresh',
-	[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Session Bridge: (Entire) Browse Checkpoints',
-	[COMMAND_ID.EXPLAIN_CHECKPOINT]: 'Session Bridge: (Entire) Explain Checkpoint',
-	[COMMAND_ID.EXPLAIN_COMMIT]: 'Session Bridge: (Entire) Explain Commit',
-	[COMMAND_ID.OPEN_RAW_TRANSCRIPT]: 'Session Bridge: (Entire) Open Raw Transcript',
-	[COMMAND_ID.REWIND_INTERACTIVE]: 'Session Bridge: (Entire) Rewind To Checkpoint',
-	[COMMAND_ID.RESUME_BRANCH]: 'Session Bridge: (Entire) Resume Branch Session',
-	[COMMAND_ID.RUN_DOCTOR]: 'Session Bridge: (Entire) Run Doctor',
-	[COMMAND_ID.CLEAN]: 'Session Bridge: (Entire) Clean Entire State',
-	[COMMAND_ID.RESET]: 'Session Bridge: (Entire) Reset Entire Session Data',
-	[COMMAND_ID.SHOW_TRACE]: 'Session Bridge: (Entire) Show Trace'
+	[COMMAND_ID.SHOW_STATUS]: 'Show Status',
+	[COMMAND_ID.ENABLE]: 'Enable In Repository',
+	[COMMAND_ID.DISABLE]: 'Disable In Repository',
+	[COMMAND_ID.REFRESH]: 'Refresh',
+	[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',
+	[COMMAND_ID.EXPLAIN_CHECKPOINT]: 'Explain Checkpoint',
+	[COMMAND_ID.EXPLAIN_COMMIT]: 'Explain Commit',
+	[COMMAND_ID.OPEN_RAW_TRANSCRIPT]: 'Open Raw Transcript',
+	[COMMAND_ID.REWIND_INTERACTIVE]: 'Rewind To Checkpoint',
+	[COMMAND_ID.RESUME_BRANCH]: 'Resume Branch Session',
+	[COMMAND_ID.RUN_DOCTOR]: 'Run Doctor',
+	[COMMAND_ID.CLEAN]: 'Clean Entire State',
+	[COMMAND_ID.RESET]: 'Reset Entire Session Data',
+	[COMMAND_ID.SHOW_TRACE]: 'Show Trace'
 };
 
-class PlaceholderTreeItem extends vscode.TreeItem {
-	constructor(label: string, description: string) {
-		super(label, vscode.TreeItemCollapsibleState.None);
-		this.description = description;
-		this.contextValue = 'placeholder';
-	}
-}
-
-class PlaceholderTreeDataProvider implements vscode.TreeDataProvider<PlaceholderTreeItem> {
-	private readonly item: PlaceholderTreeItem;
-	private readonly changeEmitter = new vscode.EventEmitter<PlaceholderTreeItem | undefined | null | void>();
-
-	readonly onDidChangeTreeData = this.changeEmitter.event;
-
-	constructor(label: string, description: string) {
-		this.item = new PlaceholderTreeItem(label, description);
-	}
-
-	refresh(): void {
-		this.changeEmitter.fire();
-	}
-
-	getTreeItem(element: PlaceholderTreeItem): vscode.TreeItem {
-		return element;
-	}
-
-	getChildren(): PlaceholderTreeItem[] {
-		return [this.item];
-	}
-}
-
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-	if (!vscode.workspace.workspaceFolders?.length) {
-		return;
-	}
-
 	const outputChannel = vscode.window.createOutputChannel(ENTIRE_OUTPUT_CHANNEL);
 	context.subscriptions.push(outputChannel);
 
-	const viewProviders = new Map<string, PlaceholderTreeDataProvider>();
+	let workspaceState = await probeEntireWorkspace(getProbeTargetPath());
+	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
+	if (vscode.workspace.workspaceFolders?.length) {
+		statusBarItem.show();
+		context.subscriptions.push(statusBarItem);
+	}
+
+	const sharedCommands = {
+		refresh: COMMAND_ID.REFRESH,
+		showStatus: COMMAND_ID.SHOW_STATUS,
+		runDoctor: COMMAND_ID.RUN_DOCTOR,
+		resumeBranch: COMMAND_ID.RESUME_BRANCH,
+		clean: COMMAND_ID.CLEAN,
+		reset: COMMAND_ID.RESET,
+		showTrace: COMMAND_ID.SHOW_TRACE,
+	} satisfies EmptyViewCommands;
+
+	const viewProviders = new Map<string, EmptyViewProvider>();
 	for (const view of VIEW_DEFINITIONS) {
-		const provider = new PlaceholderTreeDataProvider(view.label, view.description);
+		const provider = new EmptyViewProvider(getViewKind(view.id), workspaceState, sharedCommands);
 		viewProviders.set(view.id, provider);
 		context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, provider));
 	}
-
-	let workspaceState = await probeEntireWorkspace(getProbeTargetPath());
-	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
-	statusBarItem.show();
-	context.subscriptions.push(statusBarItem);
 
 	const appendCommandRun = (commandId: COMMAND_ID) => {
 		outputChannel.appendLine(`[command] ${COMMAND_TITLES[commandId] ?? commandId}`);
@@ -143,6 +117,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		const cwd = getProbeTargetPath();
 		workspaceState = await probeEntireWorkspace(cwd);
 		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
+		for (const provider of viewProviders.values()) {
+			provider.setWorkspaceState(workspaceState);
+			provider.refresh();
+		}
 
 		if (cwd) {
 			outputChannel.appendLine(`[probe] ${reason}: ${cwd}`);
@@ -173,9 +151,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			switch (commandId) {
 				case COMMAND_ID.REFRESH:
 					await refreshWorkspaceProbe('manual refresh');
-					for (const provider of viewProviders.values()) {
-						provider.refresh();
-					}
 					appendCommandRun(commandId);
 					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
 					return;
@@ -284,4 +259,19 @@ function getWorkspaceFolderPath(uri: vscode.Uri): string | undefined {
 
 function isFileBackedEditor(editor: vscode.TextEditor | undefined): editor is vscode.TextEditor {
 	return editor?.document.uri.scheme === 'file';
+}
+
+function getViewKind(viewId: string): EmptyViewKind {
+	switch (viewId) {
+		case 'session.bridge.entire.workspace':
+			return 'workspace';
+		case 'session.bridge.entire.activeSessions':
+			return 'activeSessions';
+		case 'session.bridge.entire.checkpoints':
+			return 'checkpoints';
+		case 'session.bridge.entire.recovery':
+			return 'recovery';
+	}
+
+	return 'workspace';
 }

@@ -24,7 +24,7 @@ const statusInfoMap: Record<EntireStatusState, StatusBarInfo> = {
   },
   [EntireStatusState.NOT_GIT_REPO]: {
     iconName: "repo",
-    title: "No Repo",
+    title: "Not a git repo",
     description: "Open a Git repository to use Entire features.",
   },
   [EntireStatusState.DISABLED]: {
@@ -161,7 +161,7 @@ export function updateStatusBarItem(
   workspaceState: EntireWorkspaceState,
 ): void {
   const statusInfo = getStatusBarInfo(workspaceState);
-  const label = `Session Bridge: (Entire) ${statusInfo.title}`;
+  const label = `Session Bridge (Entire): ${statusInfo.title}`;
 
   statusBarItem.name = "Session Bridge Status";
   statusBarItem.text = `$(${statusInfo.iconName}) ${label}`;

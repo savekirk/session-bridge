@@ -318,6 +318,41 @@ export function compareOptionalTimestampsDesc(left?: string, right?: string): nu
 }
 
 /**
+ * Formats a date-only checkpoint group key (`YYYY-MM-DD`) for display.
+ *
+ * @param dayKey Date bucket key used to group checkpoint commits.
+ * @returns A stable English label such as `Thursday 2 Apr`, or the original value on parse failure.
+ */
+export function formatCheckpointGroupDate(dayKey: string): string {
+	const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dayKey);
+	if (!match) {
+		return dayKey;
+	}
+
+	const [, yearText, monthText, dayText] = match;
+	const year = Number(yearText);
+	const month = Number(monthText);
+	const day = Number(dayText);
+	const date = new Date(Date.UTC(year, month - 1, day, 12));
+	const parts = new Intl.DateTimeFormat("en", {
+		weekday: "long",
+		day: "numeric",
+		month: "short",
+		timeZone: "UTC",
+	}).formatToParts(date);
+
+	const weekday = parts.find((part) => part.type === "weekday")?.value;
+	const dayNumber = parts.find((part) => part.type === "day")?.value;
+	const monthName = parts.find((part) => part.type === "month")?.value;
+
+	if (!weekday || !dayNumber || !monthName) {
+		return dayKey;
+	}
+
+	return `${weekday} ${dayNumber} ${monthName}`;
+}
+
+/**
  * Totals primary and nested subagent token usage into a single count.
  *
  * @param tokenUsage Token usage object to total.

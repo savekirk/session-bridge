@@ -17,6 +17,7 @@ export {
 	shardedCheckpointPath,
 	splitPromptText,
 	shortSha,
+	formatCheckpointGroupDate,
 	totalTokenUsage,
 	validateCheckpointId,
 } from "./util";
@@ -28,8 +29,8 @@ export {
 } from "./gitEnrichment";
 export { loadRewindIndex } from "./rewindIndex";
 export { loadSessionStateIndex, normalizeSessionStatus } from "./sessionStateJoin";
-export { filterCheckpointCards, filterSessionCards, sortCheckpointCards, sortSessionCards } from "./search";
-export { listCheckpointCards, listSessionCards, getCheckpointDetail, getRawTranscript } from "./orchestration";
+export { filterSessionCards, sortCheckpointCards, sortSessionCards } from "./search";
+export { listCheckpointCards, listCheckpointSummaries, listSessionCards, getCheckpointDetail, getRawTranscript } from "./orchestration";
 export type {
 	CheckpointStore,
 	CheckpointSummaryRecord,
@@ -52,10 +53,15 @@ export type {
 export type {
 	AssociatedCommitModel,
 	CheckpointDetailModel,
+	CheckpointSummaryModel,
 	DiffSummaryModel,
 	EntireCheckpointCard,
 	EntireSessionCard,
 	FileDiffStat,
 	RewindAvailability,
 	SessionStatus,
+	CheckpointCommit,
+	CommitCheckpointGroup,
+	ResolvedCheckpointRef,
+	CheckpointDateGroup
 } from "./models";

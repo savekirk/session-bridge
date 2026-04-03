@@ -1,4 +1,5 @@
-import type { InitialAttribution, SummaryRecord } from "./types";
+import { NormalizedRewindPoint } from "./rewindIndex";
+import type { CheckpointSummaryRecord, InitialAttribution, SummaryRecord } from "./types";
 
 /** Normalized live-or-historical session status used by card and detail models. */
 export type SessionStatus = "ACTIVE" | "IDLE" | "ENDED";
@@ -92,6 +93,53 @@ export interface EntireCheckpointCard {
 	diffSummary?: DiffSummaryModel;
 	rewindAvailability?: RewindAvailability;
 	isEphemeral: boolean;
+	searchText: string;
+}
+
+/** A commit that has one or more checkpoints associated it it */
+export interface CheckpointCommit {
+	sha: string;
+	shortSha: string;
+	message: string;
+	body?: string;
+	authorName: string;
+	authorEmail?: string;
+	authoredAt?: string;
+	fileStats?: FileDiffStat[];
+	patchText?: string;
+	checkpointIds: string[];
+}
+
+export interface ResolvedCheckpointRef {
+	checkpointId: string;
+	summary: CheckpointSummaryRecord | null;
+	rewindPoints: NormalizedRewindPoint[];
+}
+
+export interface CommitCheckpointGroup {
+	commit: CheckpointCommit;
+	diffSummary?: DiffSummaryModel,
+	checkpoints: ResolvedCheckpointRef[];
+}
+
+/** Groups checkpoint-linked commits under a shared authored day label for the tree view. */
+export interface CheckpointDateGroup {
+	timestamp: string;
+	formattedDate: string;
+	checkpointCommits: CommitCheckpointGroup[];
+}
+
+/** Lightweight model used to render the checkpoint tree without detail hydration. */
+export interface CheckpointSummaryModel {
+	id: string;
+	checkpointId?: string;
+	timestamp?: string;
+	agent?: string;
+	model?: string;
+	author?: string;
+	fileCount?: number;
+	primaryCommit?: AssociatedCommitModel;
+	diffSummary?: DiffSummaryModel;
 	searchText: string;
 }
 

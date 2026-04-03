@@ -3,6 +3,8 @@ import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
 import { probeEntireWorkspace } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
 import { EmptyViewCommands, EmptyViewKind, EmptyViewProvider } from './components/emptyViews';
+import { CheckpointTreeViewProvider, CheckpointViewCommands } from './components/checkpointTreeView';
+import { getCheckpointDetail, getRawTranscript } from './checkpoints';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
@@ -80,8 +82,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		showTrace: COMMAND_ID.SHOW_TRACE,
 	} satisfies EmptyViewCommands;
 
+	const checkpointCommands = {
+		refresh: COMMAND_ID.REFRESH,
+		explainCheckpoint: COMMAND_ID.EXPLAIN_CHECKPOINT,
+		rewindInteractive: COMMAND_ID.REWIND_INTERACTIVE,
+		openRawTranscript: COMMAND_ID.OPEN_RAW_TRANSCRIPT,
+	} satisfies CheckpointViewCommands;
+
+	const checkpointProvider = new CheckpointTreeViewProvider(
+		workspaceState,
+		getProbeTargetPath(),
+		checkpointCommands,
+		outputChannel,
+	);
+
 	const viewProviders = new Map<string, EmptyViewProvider>();
 	for (const view of VIEW_DEFINITIONS) {
+		if (view.id === 'session.bridge.entire.checkpoints') {
+			context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, checkpointProvider));
+			continue;
+		}
 		const provider = new EmptyViewProvider(getViewKind(view.id), workspaceState, sharedCommands);
 		viewProviders.set(view.id, provider);
 		context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, provider));
@@ -121,6 +141,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			provider.setWorkspaceState(workspaceState);
 			provider.refresh();
 		}
+		checkpointProvider.setWorkspaceState(workspaceState, cwd);
+		checkpointProvider.refresh();
 
 		if (cwd) {
 			outputChannel.appendLine(`[probe] ${reason}: ${cwd}`);
@@ -147,34 +169,56 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	}));
 
 	for (const commandId of Object.keys(COMMAND_TITLES) as COMMAND_ID[]) {
-		const disposable = vscode.commands.registerCommand(commandId, async () => {
+		const disposable = vscode.commands.registerCommand(commandId, async (...args: unknown[]) => {
 			switch (commandId) {
 				case COMMAND_ID.REFRESH:
-					await refreshWorkspaceProbe('manual refresh');
 					appendCommandRun(commandId);
+					outputChannel.appendLine(`[command] REFRESH: starting workspace probe`);
+					await refreshWorkspaceProbe('manual refresh');
+					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
+					checkpointProvider.reload();
 					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
 					return;
 				case COMMAND_ID.BROWSE_CHECKPOINTS:
 					appendCommandRun(commandId);
+					outputChannel.appendLine(`[command] BROWSE_CHECKPOINTS: triggering checkpoint reload and focusing view`);
+					checkpointProvider.reload();
 					await vscode.commands.executeCommand('session.bridge.entire.checkpoints.focus');
 					return;
 				case COMMAND_ID.EXPLAIN_CHECKPOINT:
 				case COMMAND_ID.EXPLAIN_COMMIT: {
 					appendCommandRun(commandId);
+					const checkpointArg = args[0] as { checkpointId?: unknown } | undefined;
+					if (!checkpointArg || typeof checkpointArg.checkpointId !== "string") {
+						await vscode.window.showWarningMessage("Checkpoint detail could not be opened.");
+						return;
+					}
+					const detail = await getCheckpointDetail(getProbeTargetPath() ?? "", checkpointArg.checkpointId);
+					if (!detail) {
+						await vscode.window.showWarningMessage(`Checkpoint ${checkpointArg.checkpointId} could not be resolved.`);
+						return;
+					}
 					const panel = vscode.window.createWebviewPanel(
 						'entireExplain',
 						COMMAND_TITLES[commandId],
 						vscode.ViewColumn.Active,
 						{ enableFindWidget: true }
 					);
-					panel.webview.html = renderPlaceholderExplainHtml(COMMAND_TITLES[commandId]);
+					panel.webview.html = renderCheckpointDetailHtml(detail);
 					return;
 				}
 				case COMMAND_ID.OPEN_RAW_TRANSCRIPT: {
 					appendCommandRun(commandId);
+					const checkpointArg = args[0] as { checkpointId?: unknown; sessionId?: unknown } | undefined;
+					if (!checkpointArg || typeof checkpointArg.checkpointId !== "string") {
+						await vscode.window.showWarningMessage("Raw transcript could not be opened.");
+						return;
+					}
+					const sessionId = typeof checkpointArg.sessionId === "string" ? checkpointArg.sessionId : undefined;
+					const transcript = await getRawTranscript(getProbeTargetPath() ?? "", checkpointArg.checkpointId, sessionId);
 					const document = await vscode.workspace.openTextDocument({
 						language: 'text',
-						content: 'Raw Entire transcript output will appear here once CLI integration is implemented.\n'
+						content: transcript ?? 'No raw transcript is available for this checkpoint.\n'
 					});
 					await vscode.window.showTextDocument(document, { preview: false });
 					return;
@@ -230,6 +274,36 @@ function renderPlaceholderExplainHtml(title: string): string {
 <body>
   <h1>${escapedTitle}</h1>
   <p>This is a placeholder panel . CLI-backed explain rendering can be wired in next.</p>
+</body>
+</html>`;
+}
+
+function renderCheckpointDetailHtml(detail: NonNullable<Awaited<ReturnType<typeof getCheckpointDetail>>>): string {
+	const escape = escapeHtml;
+	const files = detail.files.map((file) => `<li>${escape(file.path)}${file.additions !== undefined || file.deletions !== undefined ? ` (${file.additions ?? 0}/${file.deletions ?? 0})` : ""}</li>`).join("");
+	const commits = detail.associatedCommits.map((commit) => `<li><strong>${escape(commit.shortSha)}</strong> ${escape(commit.message)}</li>`).join("");
+	return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${escape(detail.title)}</title>
+  <style>
+    body { font-family: var(--vscode-font-family); color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); margin: 0; padding: 24px; line-height: 1.5; }
+    h1 { margin: 0 0 8px; }
+    .meta { opacity: .8; margin-bottom: 20px; }
+    section { margin: 20px 0; }
+    ul { margin: 8px 0 0 20px; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>${escape(detail.title)}</h1>
+  <div class="meta">${escape(detail.hash)}${detail.primaryCommit ? ` · ${escape(detail.primaryCommit.shortSha)}` : ""}</div>
+  <section><strong>Prompt:</strong> ${escape(detail.promptPreview)}</section>
+  <section><strong>Summary:</strong> ${escape(detail.overview.summary?.intent ?? detail.overview.summary?.outcome ?? "No summary available.")}</section>
+  <section><strong>Commits:</strong><ul>${commits || "<li>No associated commits</li>"}</ul></section>
+  <section><strong>Files:</strong><ul>${files || "<li>No file stats available</li>"}</ul></section>
 </body>
 </html>`;
 }

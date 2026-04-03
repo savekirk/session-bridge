@@ -1,4 +1,4 @@
-import type { EntireCheckpointCard, EntireSessionCard, SessionStatus } from "./models";
+import type { CheckpointSummaryModel, EntireCheckpointCard, EntireSessionCard, SessionStatus } from "./models";
 import { compareOptionalTimestampsDesc } from "./util";
 
 /** Shared search and filter options for normalized checkpoint and session cards. */
@@ -15,12 +15,12 @@ export interface SearchFilterOptions {
  * @param options Search, agent, and status filters to apply.
  * @returns Filtered checkpoint cards in stable sorted order.
  */
-export function filterCheckpointCards(
-	cards: EntireCheckpointCard[],
-	options: SearchFilterOptions = {},
-): EntireCheckpointCard[] {
-	return sortCheckpointCards(cards).filter((card) => matchesCard(card.searchText, card.agent, card.status, options));
-}
+// export function filterCheckpointCards(
+// 	cards: Array<EntireCheckpointCard | CheckpointSummaryModel>,
+// 	options: SearchFilterOptions = {},
+// ): Array<EntireCheckpointCard | CheckpointSummaryModel> {
+// 	return sortCheckpointCards(cards).filter((card) => matchesCard(card.displayHash, card.displayHash, card., options));
+// }
 
 /**
  * Filters and sorts session cards using precomputed `searchText` and status metadata.
@@ -42,7 +42,7 @@ export function filterSessionCards(
  * @param cards Checkpoint cards to sort.
  * @returns A new array containing the sorted checkpoint cards.
  */
-export function sortCheckpointCards(cards: EntireCheckpointCard[]): EntireCheckpointCard[] {
+export function sortCheckpointCards<T extends { timestamp?: string; displayHash: string }>(cards: T[]): T[] {
 	return [...cards].sort((left, right) => {
 		const timestampComparison = compareOptionalTimestampsDesc(left.timestamp, right.timestamp);
 		if (timestampComparison !== 0) {

@@ -1,4 +1,4 @@
-import type { AssociatedCommitModel, DiffSummaryModel, FileDiffStat } from "./models";
+import type { AssociatedCommitModel, CheckpointCommit, DiffSummaryModel, FileDiffStat } from "./models";
 import { GitCheckpointStore } from "./gitStore";
 import { execGit, getCurrentBranchName, getHeadSha, isCheckpointId, parseTimestamp, shortSha } from "./util";
 
@@ -6,11 +6,12 @@ import { execGit, getCurrentBranchName, getHeadSha, isCheckpointId, parseTimesta
 export interface GitEnrichmentIndex {
 	currentBranch: string | null;
 	headSha: string | null;
-	checkpointCommits: Map<string, AssociatedCommitModel[]>;
+	checkpointCommits: CheckpointCommit[];
 }
 
 /**
  * Builds the active-branch checkpoint association index from `Entire-Checkpoint` commit trailers.
+ * The same checkpoint ID can appear on multiple commit hashes after amend/rebase, because the checkpoint ID is treated as a stable link and amend preserves it.
  *
  * @param repoPath Repository root used to inspect branch state and git history.
  * @returns Active-branch checkpoint associations plus current branch and `HEAD` metadata.
@@ -21,35 +22,23 @@ export async function buildGitEnrichmentIndex(repoPath: string): Promise<GitEnri
 		getHeadSha(repoPath),
 		readCheckpointLog(repoPath),
 	]);
-	const store = new GitCheckpointStore(repoPath);
-	const latestCreatedAtByCheckpoint = new Map<string, Promise<number>>();
-	const checkpointCommits = new Map<string, AssociatedCommitModel[]>();
-	const seenByCheckpoint = new Map<string, Set<string>>();
+	let checkpointCommits = [];
 
 	for (const entry of parseGitLog(logOutput)) {
-		const checkpointIds = await resolveCheckpointIdsForCommit(entry.fullMessage, store, latestCreatedAtByCheckpoint);
-		for (const checkpointId of checkpointIds) {
-			const seen = seenByCheckpoint.get(checkpointId) ?? new Set<string>();
-			if (seen.has(entry.sha)) {
-				continue;
-			}
+		const commit = {
+			sha: entry.sha,
+			shortSha: shortSha(entry.sha) ?? entry.sha,
+			message: entry.subject,
+			body: entry.body || undefined,
+			authorName: entry.authorName,
+			authorEmail: entry.authorEmail || undefined,
+			authoredAt: entry.authoredAt || undefined,
+			checkpointIds: extractCheckpointIds(entry.fullMessage)
+		};
 
-			seen.add(entry.sha);
-			seenByCheckpoint.set(checkpointId, seen);
-
-			const commits = checkpointCommits.get(checkpointId) ?? [];
-			commits.push({
-				sha: entry.sha,
-				shortSha: shortSha(entry.sha) ?? entry.sha,
-				message: entry.subject,
-				body: entry.body || undefined,
-				authorName: entry.authorName,
-				authorEmail: entry.authorEmail || undefined,
-				authoredAt: entry.authoredAt || undefined,
-			});
-			checkpointCommits.set(checkpointId, commits);
-		}
+		checkpointCommits.push(commit);
 	}
+
 
 	return {
 		currentBranch,
@@ -133,9 +122,9 @@ function getLatestCreatedAtForCheckpoint(
  */
 export async function hydrateAssociatedCommits(
 	repoPath: string,
-	commits: AssociatedCommitModel[],
+	commits: CheckpointCommit[],
 	includePatch: boolean,
-): Promise<AssociatedCommitModel[]> {
+): Promise<CheckpointCommit[]> {
 	return Promise.all(commits.map(async (commit) => {
 		const fileStats = await readNumstat(repoPath, commit.sha);
 		const patchText = includePatch ? await readPatch(repoPath, commit.sha) : commit.patchText;

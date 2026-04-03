@@ -41,7 +41,7 @@ export class CheckpointTreeItem extends vscode.TreeItem {
 		);
 
 		this.description = buildCheckpointDescription(card);
-		// this.tooltip = buildCheckpointTooltip(card);
+		this.tooltip = buildCommitTooltip(card);
 		this.iconPath = new vscode.ThemeIcon('git-commit');
 		this.contextValue = CONTEXT_CHECKPOINT_COMMITTED;
 
@@ -316,57 +316,152 @@ function buildCheckpointTooltip(card: CheckpointDateGroup): vscode.MarkdownStrin
 	return tooltip;
 }
 
+function buildCommitTooltip(card: CommitCheckpointGroup): vscode.MarkdownString {
+	const tooltip = new vscode.MarkdownString(undefined, true);
+	tooltip.isTrusted = false;
+	tooltip.supportThemeIcons = true;
+
+	tooltip.appendMarkdown(`**Commit:** \`${escapeMarkdown(card.commit.shortSha)}\`\n\n`);
+	tooltip.appendMarkdown(`**Message:** ${escapeMarkdown(card.commit.message)}\n\n`);
+
+	if (card.commit.authorName) {
+		tooltip.appendMarkdown(`**Author:** ${escapeMarkdown(card.commit.authorName)}\n\n`);
+	}
+
+	if (card.commit.authoredAt) {
+		tooltip.appendMarkdown(`**Authored:** ${escapeMarkdown(formatShortTimestamp(card.commit.authoredAt))}\n\n`);
+	}
+
+	tooltip.appendMarkdown(`**Checkpoints:** ${card.checkpoints.length}\n\n`);
+
+	let totalSessions = 0;
+	let totalTokens = 0;
+	let hasTokens = false;
+	const filesTouched = new Set<string>();
+
+	for (const checkpoint of card.checkpoints) {
+		if (!checkpoint.summary) {
+			continue;
+		}
+
+		totalSessions += checkpoint.summary.sessions.length;
+		for (const file of checkpoint.summary.filesTouched) {
+			filesTouched.add(file);
+		}
+
+		const tokens = totalTokenUsage(checkpoint.summary.tokenUsage);
+		if (typeof tokens === "number") {
+			totalTokens += tokens;
+			hasTokens = true;
+		}
+	}
+
+	if (totalSessions > 0) {
+		tooltip.appendMarkdown(`**Sessions:** ${totalSessions}\n\n`);
+	}
+
+	if (filesTouched.size > 0) {
+		tooltip.appendMarkdown(`**Files touched:** ${filesTouched.size}\n\n`);
+	}
+
+	if (card.diffSummary) {
+		const parts = [`${card.diffSummary.filesChanged} file(s)`];
+		if (typeof card.diffSummary.linesAdded === "number") {
+			parts.push(`+${card.diffSummary.linesAdded}`);
+		}
+		if (typeof card.diffSummary.linesRemoved === "number") {
+			parts.push(`-${card.diffSummary.linesRemoved}`);
+		}
+		tooltip.appendMarkdown(`**Changes:** ${parts.join(", ")}\n\n`);
+	}
+
+	if (hasTokens) {
+		tooltip.appendMarkdown(`**Tokens:** ${formatTokenCount(totalTokens)}\n\n`);
+	}
+
+	return tooltip;
+}
+
 function hasChildren(card: CommitCheckpointGroup): boolean {
-	const checkpoint = card.checkpoints.find((entry) => entry.summary !== null) ?? card.checkpoints.at(0);
-	return Boolean(
-		card.commit.authorName
-		|| (checkpoint?.summary && card.diffSummary),
-	);
+	return buildCommitDetailRows(card).length > 0;
 }
 
 function buildCommitCheckpointItems(committedCheckpoints: CommitCheckpointGroup[], commands: CheckpointViewCommands): vscode.TreeItem[] {
 	return committedCheckpoints.map((committed) => new CheckpointTreeItem(committed, commands));
 }
 function buildChildItems(card: CommitCheckpointGroup): vscode.TreeItem[] {
-	const children: vscode.TreeItem[] = [];
-	if (card.checkpoints.length === 0) {
-		return children;
-	}
-	const checkpoint = (card.checkpoints.find((entry) => entry.summary !== null) ?? card.checkpoints.at(0)) as ResolvedCheckpointRef;
+	return buildCommitDetailRows(card).map((detail) => new CheckpointDetailItem(
+		detail.label,
+		detail.description,
+		detail.icon,
+		detail.tooltip,
+	));
+}
 
+function buildCommitDetailRows(card: CommitCheckpointGroup): Array<{
+	label: string;
+	description: string;
+	icon: string;
+	tooltip?: string;
+}> {
+	const rows: Array<{
+		label: string;
+		description: string;
+		icon: string;
+		tooltip?: string;
+	}> = [];
+	const checkpoint = selectRepresentativeCheckpoint(card);
+	const summary = checkpoint?.summary;
 
 	if (card.commit.authorName) {
-		children.push(new CheckpointDetailItem(
-			"Author",
-			card.commit.authorName,
-			"person",
-		));
+		rows.push({
+			label: "Author",
+			description: card.commit.authorName,
+			icon: "person",
+		});
 	}
 
+	rows.push({
+		label: "Checkpoints",
+		description: `${card.checkpoints.length}`,
+		icon: "history",
+	});
 
-	const summary = checkpoint.summary;
-	if (summary) {
-		const parts: string[] = [];
-		parts.push(`${summary.filesTouched.length} file(s)`);
-		if (card.diffSummary) {
-			if (typeof card.diffSummary.linesAdded === "number") {
-				parts.push(`+${card.diffSummary.linesAdded}`);
-			}
-			if (typeof card.diffSummary.linesRemoved === "number") {
-				parts.push(`-${card.diffSummary.linesRemoved}`);
-			}
+	const changeParts: string[] = [];
+	if (card.diffSummary) {
+		changeParts.push(`${card.diffSummary.filesChanged} file(s)`);
+		if (typeof card.diffSummary.linesAdded === "number") {
+			changeParts.push(`+${card.diffSummary.linesAdded}`);
 		}
-		children.push(new CheckpointDetailItem("Changes", parts.join(", "), "diff"));
-
-		const tokenCount = totalTokenUsage(summary.tokenUsage);
-		if (typeof tokenCount === "number") {
-			children.push(new CheckpointDetailItem("Tokens", formatTokenCount(tokenCount), "symbol-number"));
+		if (typeof card.diffSummary.linesRemoved === "number") {
+			changeParts.push(`-${card.diffSummary.linesRemoved}`);
 		}
-
-
+	} else if (summary) {
+		changeParts.push(`${summary.filesTouched.length} file(s)`);
 	}
 
-	return children;
+	if (changeParts.length > 0) {
+		rows.push({
+			label: "Changes",
+			description: changeParts.join(", "),
+			icon: "diff",
+		});
+	}
+
+	const tokenCount = summary ? totalTokenUsage(summary.tokenUsage) : undefined;
+	if (typeof tokenCount === "number") {
+		rows.push({
+			label: "Tokens",
+			description: formatTokenCount(tokenCount),
+			icon: "symbol-number",
+		});
+	}
+
+	return rows;
+}
+
+function selectRepresentativeCheckpoint(card: CommitCheckpointGroup): ResolvedCheckpointRef | undefined {
+	return card.checkpoints.find((entry) => entry.summary !== null) ?? card.checkpoints.at(0);
 }
 
 function buildDisabledItems(
@@ -426,4 +521,8 @@ function formatTokenCount(count: number): string {
 		return `${(count / 1_000).toFixed(1)}k`;
 	}
 	return String(count);
+}
+
+function escapeMarkdown(value: string): string {
+	return value.replace(/[\\`*_{}\[\]()#+\-.!|]/g, "\\$&");
 }

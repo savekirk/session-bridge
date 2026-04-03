@@ -5,10 +5,12 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import {
+	buildGitEnrichmentIndex,
 	filterSessionCards,
 	getCheckpointDetail,
 	getRawTranscript,
 	listCheckpointCards,
+	listCheckpointSummaries,
 	listSessionCards,
 	loadRewindIndex,
 } from "../../checkpoints";
@@ -128,6 +130,13 @@ suite("Checkpoint Module", () => {
 			], null, 2);
 
 			await withMockEntire(repoDir, rewindOutput, async () => {
+				const enrichmentIndex = await buildGitEnrichmentIndex(repoDir);
+				assert.ok(enrichmentIndex.checkpointCommits.every((commit) => commit.checkpointIds.length > 0));
+				assert.strictEqual(enrichmentIndex.checkpointCommits.some((commit) => commit.message === "Initial commit"), false);
+
+				const checkpointSummaries = await listCheckpointSummaries(repoDir);
+				assert.ok(checkpointSummaries.every((group) => group.checkpointCommits.every((commit) => commit.checkpoints.length > 0)));
+
 				const checkpointCards = await listCheckpointCards(repoDir);
 				assert.strictEqual(checkpointCards.length, 1);
 				const committedCard = checkpointCards.find((card) => card.checkpointId === "a3b2c4d5e6f7");

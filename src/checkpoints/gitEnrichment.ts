@@ -22,9 +22,14 @@ export async function buildGitEnrichmentIndex(repoPath: string): Promise<GitEnri
 		getHeadSha(repoPath),
 		readCheckpointLog(repoPath),
 	]);
-	let checkpointCommits = [];
+	const checkpointCommits: CheckpointCommit[] = [];
 
 	for (const entry of parseGitLog(logOutput)) {
+		const checkpointIds = extractCheckpointIds(entry.fullMessage);
+		if (checkpointIds.length === 0) {
+			continue;
+		}
+
 		const commit = {
 			sha: entry.sha,
 			shortSha: shortSha(entry.sha) ?? entry.sha,
@@ -33,7 +38,7 @@ export async function buildGitEnrichmentIndex(repoPath: string): Promise<GitEnri
 			authorName: entry.authorName,
 			authorEmail: entry.authorEmail || undefined,
 			authoredAt: entry.authoredAt || undefined,
-			checkpointIds: extractCheckpointIds(entry.fullMessage)
+			checkpointIds,
 		};
 
 		checkpointCommits.push(commit);

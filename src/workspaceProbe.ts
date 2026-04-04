@@ -1,4 +1,6 @@
-import { tryExecGit } from "./checkpoints/util";
+import type { EntireActiveSessionCard } from "./checkpoints";
+import { listActiveSessions } from "./checkpoints";
+import { getGitRepoRoot, tryExecGit } from "./checkpoints/util";
 import { EntireBinary, isEntireResolveError, resolveEntireBinary } from "./entireBinaryResolver";
 import { EntireSettings, getEntireSettingsPaths, resolveEntireSettings } from "./entireSettings";
 import { runCommandAsync } from "./runCommand";
@@ -14,19 +16,7 @@ export interface EntireWorkspaceState {
   binary?: EntireBinary;
   settings?: EntireSettings;
   warnings: string[];
-  activeSessions: EntireSessionSummary[];
-}
-
-export interface EntireSessionSummary {
-  sessionId: string;
-  agentType?: string;
-  modelName?: string;
-  phase?: "active" | "idle" | "ended" | string;
-  lastPrompt?: string;
-  worktreePath?: string;
-  startedAt?: string;
-  lastInteractionAt?: string;
-  tokenUsage?: number;
+  activeSessions: EntireActiveSessionCard[];
 }
 
 /**
@@ -57,8 +47,23 @@ async function isEntireEnabled(cwd?: string): Promise<boolean> {
   return false;
 }
 
+/**
+ * Probes the current workspace target and produces the extension's normalized
+ * repository state snapshot.
+ *
+ * The probe accepts either a repository path or a file path within a repository.
+ * It first resolves the owning git root, then reads the Entire binary/settings
+ * state for that repository, and finally loads the current live sessions from
+ * the checkpoint module. This keeps the status bar, tree views, and command
+ * handlers aligned on the same repository even when VS Code is focused on a
+ * file inside a nested repo.
+ *
+ * @param cwd File or directory path used as the starting point for repository resolution.
+ * @returns Normalized workspace state for the resolved repository target.
+ */
 export async function probeEntireWorkspace(cwd: string | undefined): Promise<EntireWorkspaceState> {
-  try {
+	try {
+    const repoPath = cwd ? await getGitRepoRoot(cwd) ?? cwd : undefined;
     var workspaceState: EntireWorkspaceState = {
       state: EntireStatusState.DISABLED,
       warnings: [],
@@ -75,24 +80,31 @@ export async function probeEntireWorkspace(cwd: string | undefined): Promise<Ent
       return workspaceState;
     }
 
-    const gitStatus = cwd !== undefined && await isGitRepo(cwd);
+    const gitStatus = repoPath !== undefined && await isGitRepo(repoPath);
     if (!gitStatus) {
       workspaceState.state = EntireStatusState.NOT_GIT_REPO;
 
       return workspaceState;
     }
 
-    let settings = await resolveEntireSettings(cwd);
+    const settingsPath = repoPath;
+    let settings = await resolveEntireSettings(settingsPath);
 
     if (settings.settingsPaths.length === 0) {
       warnings.push("No Entire settings file found.");
       // fallback to entire status command
-      settings.enabled = await isEntireEnabled(cwd);
+      settings.enabled = await isEntireEnabled(repoPath);
     }
     workspaceState.settings = settings;
 
     if (settings.enabled) {
       workspaceState.state = EntireStatusState.ENABLED;
+      try {
+        workspaceState.activeSessions = await listActiveSessions(repoPath);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        warnings.push(`Failed to load active sessions: ${message}`);
+      }
     }
 
     workspaceState.binary = resolved;

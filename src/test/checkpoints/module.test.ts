@@ -11,10 +11,12 @@ import {
 	getCheckpointDetail,
 	getRawExplainOutput,
 	getRawTranscript,
+	listActiveSessions,
 	listCheckpointCards,
 	listCheckpointSummaries,
 	listSessionCards,
 	loadRewindIndex,
+	shadowBranchNameForCommit,
 } from "../../checkpoints";
 
 const fixtureRoot = path.resolve(__dirname, "../../../src/test/checkpoints/fixtures/store");
@@ -62,18 +64,26 @@ suite("Checkpoint Module", () => {
 
 		try {
 			const setup = createRepoWithMetadata(repoDir);
+			const liveTranscriptPath = path.join(repoDir, "live-transcript.jsonl");
+			writeFileSync(liveTranscriptPath, "{\"type\":\"message\",\"text\":\"live transcript\"}\n", "utf8");
+			createShadowBranch(repoDir, shadowBranchNameForCommit(setup.mainHead, ""));
+			const now = Date.now();
+			const startedAlpha = new Date(now - 30 * 60 * 1000).toISOString();
+			const interactedAlpha = new Date(now - 2 * 60 * 60 * 1000).toISOString();
+			const startedLiveOnly = new Date(now - 20 * 60 * 1000).toISOString();
+			const interactedLiveOnly = new Date(now - 5 * 60 * 1000).toISOString();
+			const staleInteraction = new Date(now - 8 * 24 * 60 * 60 * 1000).toISOString();
 			writeLiveSessionState(repoDir, {
 				session_id: "2026-03-30-alpha",
 				base_commit: setup.mainHead,
 				worktree_path: repoDir,
-				started_at: "2026-03-30T10:00:00Z",
+				started_at: startedAlpha,
 				phase: "active",
-				last_interaction_time: "2026-03-30T15:00:00Z",
+				last_interaction_time: interactedAlpha,
 				checkpoint_count: 2,
 				last_checkpoint_id: "a3b2c4d5e6f7",
 				agent_type: "Claude Code",
 				model_name: "claude-sonnet-4-20250514",
-				last_prompt: "Build the parser",
 				token_usage: {
 					input_tokens: 100,
 					cache_creation_tokens: 0,
@@ -86,13 +96,14 @@ suite("Checkpoint Module", () => {
 				session_id: "live-only",
 				base_commit: setup.mainHead,
 				worktree_path: repoDir,
-				started_at: "2026-03-30T16:00:00Z",
+				started_at: startedLiveOnly,
 				phase: "idle",
-				last_interaction_time: "2026-03-30T16:05:00Z",
+				last_interaction_time: interactedLiveOnly,
 				checkpoint_count: 1,
 				agent_type: "Cursor",
 				model_name: "cursor-sonnet",
 				last_prompt: "Investigate failing test",
+				transcript_path: liveTranscriptPath,
 				token_usage: {
 					input_tokens: 10,
 					cache_creation_tokens: 0,
@@ -105,8 +116,43 @@ suite("Checkpoint Module", () => {
 				session_id: "other-worktree",
 				base_commit: setup.mainHead,
 				worktree_path: path.join(repoDir, "..", "other"),
-				started_at: "2026-03-30T17:00:00Z",
+				started_at: startedLiveOnly,
 				phase: "active",
+			});
+			writeLiveSessionState(repoDir, {
+				session_id: "unreachable-base",
+				base_commit: setup.featureOnlyCommit,
+				worktree_path: repoDir,
+				started_at: startedLiveOnly,
+				phase: "active",
+				last_interaction_time: interactedLiveOnly,
+			});
+			writeLiveSessionState(repoDir, {
+				session_id: "orphan-idle",
+				base_commit: setup.secondCommit,
+				worktree_path: repoDir,
+				started_at: startedLiveOnly,
+				phase: "idle",
+				last_interaction_time: interactedLiveOnly,
+			});
+			writeLiveSessionState(repoDir, {
+				session_id: "stale-session",
+				base_commit: setup.mainHead,
+				worktree_path: repoDir,
+				started_at: staleInteraction,
+				phase: "active",
+				last_interaction_time: staleInteraction,
+			});
+			writeLiveSessionState(repoDir, {
+				session_id: "ended-session",
+				base_commit: setup.mainHead,
+				worktree_path: repoDir,
+				started_at: startedLiveOnly,
+				ended_at: interactedLiveOnly,
+				phase: "ended",
+				last_interaction_time: interactedLiveOnly,
+				checkpoint_count: 1,
+				last_checkpoint_id: "a3b2c4d5e6f7",
 			});
 
 			const rewindOutput = JSON.stringify([
@@ -154,7 +200,7 @@ suite("Checkpoint Module", () => {
 				assert.strictEqual(temporaryCard.status, "IDLE");
 
 				const sessionCards = await listSessionCards(repoDir);
-				assert.strictEqual(sessionCards.length, 3);
+				assert.strictEqual(sessionCards.length, 4);
 				const liveOnlySession = sessionCards.find((card) => card.sessionId === "live-only");
 				assert.ok(liveOnlySession);
 				assert.strictEqual(liveOnlySession.status, "IDLE");
@@ -162,6 +208,28 @@ suite("Checkpoint Module", () => {
 				assert.ok(alphaSession);
 				assert.strictEqual(alphaSession.status, "ACTIVE");
 				assert.strictEqual(alphaSession.checkpointCount, 2);
+
+				const activeSessions = await listActiveSessions(repoDir);
+				assert.strictEqual(activeSessions.length, 2);
+				const activeAlpha = activeSessions.find((card) => card.sessionId === "2026-03-30-alpha");
+				assert.ok(activeAlpha);
+				assert.strictEqual(activeAlpha.status, "ACTIVE");
+				assert.strictEqual(activeAlpha.author, "Test User");
+				assert.strictEqual(activeAlpha.promptPreview, "Build the parser");
+				assert.strictEqual(activeAlpha.hasShadowBranch, true);
+				assert.strictEqual(activeAlpha.canRunDoctor, true);
+				assert.strictEqual(activeAlpha.canOpenLastCheckpoint, true);
+				assert.strictEqual(activeAlpha.canOpenTranscript, false);
+				const activeLiveOnly = activeSessions.find((card) => card.sessionId === "live-only");
+				assert.ok(activeLiveOnly);
+				assert.strictEqual(activeLiveOnly.status, "IDLE");
+				assert.strictEqual(activeLiveOnly.promptPreview, "Investigate failing test");
+				assert.strictEqual(activeLiveOnly.canOpenTranscript, true);
+				assert.strictEqual(activeLiveOnly.hasShadowBranch, true);
+				assert.strictEqual(activeSessions.some((card) => card.sessionId === "stale-session"), false);
+				assert.strictEqual(activeSessions.some((card) => card.sessionId === "orphan-idle"), false);
+				assert.strictEqual(activeSessions.some((card) => card.sessionId === "unreachable-base"), false);
+				assert.strictEqual(activeSessions.some((card) => card.sessionId === "ended-session"), false);
 
 				const detail = await getCheckpointDetail(repoDir, "a3b2c4d5e6f7");
 				assert.ok(detail);
@@ -203,7 +271,12 @@ suite("Checkpoint Module", () => {
 	});
 });
 
-function createRepoWithMetadata(repoDir: string): { mainHead: string; secondCommit: string; multiTrailerCommit: string } {
+function createRepoWithMetadata(repoDir: string): {
+	mainHead: string;
+	secondCommit: string;
+	multiTrailerCommit: string;
+	featureOnlyCommit: string;
+} {
 	git(repoDir, ["init"]);
 	git(repoDir, ["config", "user.name", "Test User"]);
 	git(repoDir, ["config", "user.email", "test@example.com"]);
@@ -228,6 +301,7 @@ function createRepoWithMetadata(repoDir: string): { mainHead: string; secondComm
 	writeFileSync(path.join(repoDir, "src", "parser.ts"), "export const other = true;\n", "utf8");
 	git(repoDir, ["add", "src/parser.ts"]);
 	git(repoDir, ["commit", "-m", "Feature-only parser commit\n\nEntire-Checkpoint: b4c5d6e7f8a9"]);
+	const featureOnlyCommit = git(repoDir, ["rev-parse", "HEAD"]).trim();
 	git(repoDir, ["checkout", "main"]);
 
 	writeFileSync(path.join(repoDir, "src", "merge.ts"), "export const squashed = true;\n", "utf8");
@@ -246,6 +320,7 @@ function createRepoWithMetadata(repoDir: string): { mainHead: string; secondComm
 		mainHead: git(repoDir, ["rev-parse", "HEAD"]).trim(),
 		secondCommit,
 		multiTrailerCommit,
+		featureOnlyCommit,
 	};
 }
 
@@ -253,6 +328,10 @@ function writeLiveSessionState(repoDir: string, state: Record<string, unknown>):
 	const stateDir = path.join(repoDir, ".git", "entire-sessions");
 	mkdirSync(stateDir, { recursive: true });
 	writeFileSync(path.join(stateDir, `${state.session_id as string}.json`), JSON.stringify(state, null, 2), "utf8");
+}
+
+function createShadowBranch(repoDir: string, branchName: string): void {
+	git(repoDir, ["branch", branchName, "HEAD"]);
 }
 
 function git(repoPath: string, args: string[]): string {

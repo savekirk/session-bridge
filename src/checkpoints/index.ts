@@ -9,11 +9,14 @@ export {
 	compareOptionalTimestampsDesc,
 	getCurrentBranchName,
 	getGitCommonDir,
+	getGitRepoRoot,
+	hashWorktreeId,
 	isCheckpointId,
 	parseCheckpointSummary,
 	parseCommittedMetadata,
 	promptDescription,
 	readGitText,
+	shadowBranchNameForCommit,
 	shardedCheckpointPath,
 	splitPromptText,
 	shortSha,
@@ -28,9 +31,10 @@ export {
 	summarizeFileStats,
 } from "./gitEnrichment";
 export { loadRewindIndex } from "./rewindIndex";
-export { loadSessionStateIndex, normalizeSessionStatus } from "./sessionStateJoin";
+export { isSessionStateStale, loadSessionStateIndex, normalizeSessionPhase, normalizeSessionStatus } from "./sessionStateJoin";
 export { filterSessionCards, sortCheckpointCards, sortSessionCards } from "./search";
 export {
+	listActiveSessions,
 	listCheckpointCards,
 	listCheckpointSummaries,
 	listSessionCards,
@@ -63,6 +67,7 @@ export type {
 	CommitDetailModel,
 	CheckpointDetailModel,
 	CheckpointSummaryModel,
+	EntireActiveSessionCard,
 	DiffSummaryModel,
 	EntireCheckpointCard,
 	EntireSessionCard,

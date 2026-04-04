@@ -163,6 +163,9 @@ export interface LiveSessionStateRecord {
 	lastInteractionAt?: string;
 	checkpointCount?: number;
 	lastCheckpointId?: string;
+	filesTouched: string[];
+	fullyCondensed: boolean;
+	attachedManually: boolean;
 	agentType?: string;
 	modelName?: string;
 	tokenUsage?: TokenUsage;
@@ -172,5 +175,8 @@ export interface LiveSessionStateRecord {
 	contextWindowSize?: number;
 	transcriptPath?: string;
 	lastPrompt?: string;
+	hasShadowBranch: boolean;
+	isStuck: boolean;
+	canRunDoctor: boolean;
 	raw: JsonObject;
 }

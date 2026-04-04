@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { EntireSessionSummary, EntireStatusState, EntireWorkspaceState } from "../workspaceProbe";
+import { EntireStatusState, EntireWorkspaceState } from "../workspaceProbe";
 
 interface StatusBarInfo {
   iconName: string;
@@ -35,29 +35,35 @@ const statusInfoMap: Record<EntireStatusState, StatusBarInfo> = {
 };
 
 function getStatusBarInfo(workspaceState: EntireWorkspaceState): StatusBarInfo {
-  if (workspaceState.state !== EntireStatusState.ENABLED) {
-    return statusInfoMap[workspaceState.state];
-  }
+	if (workspaceState.state !== EntireStatusState.ENABLED) {
+		return statusInfoMap[workspaceState.state];
+	}
 
-  const sessionCount = workspaceState.activeSessions.length;
-  if (sessionCount > 1) {
-    return {
-      iconName: "layers",
-      title: `${sessionCount} Sessions`,
-      description: "Multiple Entire sessions are active in this workspace.",
-    };
-  }
+	const sessionCount = workspaceState.activeSessions.length;
+	if (sessionCount > 1) {
+		const activeCount = workspaceState.activeSessions.filter((session) => session.status === "ACTIVE").length;
+		return {
+			iconName: "layers",
+			title: `${sessionCount} Sessions`,
+			description: activeCount > 0
+				? `Multiple Entire sessions are live in this workspace (${activeCount} active).`
+				: "Multiple Entire sessions are live in this workspace.",
+		};
+	}
 
-  if (sessionCount === 1) {
-    const session = workspaceState.activeSessions[0];
-    const agent = formatAgentName(session.agentType);
+	if (sessionCount === 1) {
+		const session = workspaceState.activeSessions[0];
+		const agent = formatAgentName(session.agent);
+		const stateLabel = session.status === "ACTIVE" ? "Active" : "Idle";
 
-    return {
-      iconName: "pulse",
-      title: agent ? `Active · ${agent}` : "Active",
-      description: "Entire is actively tracking a session in this workspace.",
-    };
-  }
+		return {
+			iconName: session.status === "ACTIVE" ? "pulse" : "clock",
+			title: agent ? `${stateLabel} · ${agent}` : stateLabel,
+			description: session.status === "ACTIVE"
+				? "Entire is actively tracking a session in this workspace."
+				: "Entire is tracking an idle live session in this workspace.",
+		};
+	}
 
   return statusInfoMap[EntireStatusState.ENABLED];
 }
@@ -112,22 +118,22 @@ function buildTooltip(statusInfo: StatusBarInfo, workspaceState: EntireWorkspace
   return tooltip;
 }
 
-function describeSession(session: EntireSessionSummary): string {
-  const parts: string[] = [];
-  const agent = formatAgentName(session.agentType);
+function describeSession(session: EntireWorkspaceState["activeSessions"][number]): string {
+	const parts: string[] = [];
+	const agent = formatAgentName(session.agent);
 
-  if (agent) {
-    parts.push(agent);
-  }
-  if (session.modelName) {
-    parts.push(session.modelName);
-  }
-  if (session.phase) {
-    parts.push(session.phase);
-  }
-  if (session.sessionId) {
-    parts.push(`#${session.sessionId.slice(0, 8)}`);
-  }
+	if (agent) {
+		parts.push(agent);
+	}
+	if (session.model) {
+		parts.push(session.model);
+	}
+	if (session.status) {
+		parts.push(session.status);
+	}
+	if (session.sessionId) {
+		parts.push(`#${session.sessionId.slice(0, 8)}`);
+	}
 
   return parts.join(" · ");
 }

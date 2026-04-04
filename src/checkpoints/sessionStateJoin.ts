@@ -1,10 +1,13 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { getGitCommonDir, isJsonObject, isAncestor, parseTokenUsage } from "./util";
+import { runCommandAsync } from "../runCommand";
+import { getGitCommonDir, isJsonObject, isAncestor, parseTimestamp, parseTokenUsage, shadowBranchNameForCommit } from "./util";
 import type { LiveSessionStateRecord } from "./types";
 import type { SessionStatus } from "./models";
 
 const SESSION_STATE_DIR_NAME = "entire-sessions";
+const STALE_SESSION_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
+const STUCK_SESSION_THRESHOLD_MS = 60 * 60 * 1000;
 
 /** Indexed live-session state for the current worktree and active-branch context. */
 export interface SessionStateIndex {
@@ -48,15 +51,33 @@ export async function loadSessionStateIndex(repoPath: string): Promise<SessionSt
 			continue;
 		}
 
-		if (state.worktreePath && path.resolve(state.worktreePath) !== currentWorktreePath) {
+		if (!state.worktreePath || path.resolve(state.worktreePath) !== currentWorktreePath) {
 			continue;
 		}
 
-		if (state.baseCommit && !(await isAncestor(repoPath, state.baseCommit, "HEAD"))) {
+		if (isSessionStateStale(state)) {
 			continue;
 		}
 
+		if (!state.baseCommit) {
+			continue;
+		}
+
+		if (!(await isAncestor(repoPath, state.baseCommit, "HEAD"))) {
+			continue;
+		}
+
+		const hasShadowBranch = await shadowBranchExists(repoPath, state);
+		const normalizedPhase = normalizeSessionPhase(state.phase);
+		if (!hasShadowBranch && normalizedPhase !== "active" && !state.lastCheckpointId) {
+			continue;
+		}
+
+		const isStuck = deriveIsStuck(state, hasShadowBranch);
 		sessions.push(state);
+		state.hasShadowBranch = hasShadowBranch;
+		state.isStuck = isStuck;
+		state.canRunDoctor = isStuck;
 	}
 
 	sessions.sort((left, right) => (Date.parse(right.lastInteractionAt ?? right.startedAt ?? "") || 0) - (Date.parse(left.lastInteractionAt ?? left.startedAt ?? "") || 0));
@@ -79,11 +100,45 @@ export function normalizeSessionStatus(phase?: string, endedAt?: string): Sessio
 		return "ENDED";
 	}
 
-	if (phase === "active") {
+	if (normalizeSessionPhase(phase) === "active") {
 		return "ACTIVE";
 	}
 
 	return "IDLE";
+}
+
+/**
+ * Mirrors the CLI phase normalization behavior, treating empty or unknown phases as idle.
+ *
+ * @param phase Raw session phase value from live state.
+ * @returns Normalized session phase.
+ */
+export function normalizeSessionPhase(phase?: string): "active" | "idle" | "ended" {
+	switch (phase) {
+		case "active":
+		case "active_committed":
+			return "active";
+		case "ended":
+			return "ended";
+		case "idle":
+		default:
+			return "idle";
+	}
+}
+
+/**
+ * Mirrors the CLI stale-session threshold used when reading `.git/entire-sessions`.
+ *
+ * @param state Live session state record to inspect.
+ * @returns `true` when the session should be treated as stale.
+ */
+export function isSessionStateStale(state: Pick<LiveSessionStateRecord, "lastInteractionAt" | "startedAt">): boolean {
+	const referenceTime = parseTimestamp(state.lastInteractionAt) ?? parseTimestamp(state.startedAt);
+	if (referenceTime === undefined) {
+		return false;
+	}
+
+	return Date.now() - referenceTime > STALE_SESSION_THRESHOLD_MS;
 }
 
 /**
@@ -149,6 +204,9 @@ async function readSessionState(filePath: string): Promise<LiveSessionStateRecor
 			lastInteractionAt: asString(parsed.last_interaction_time),
 			checkpointCount: asNumber(parsed.checkpoint_count),
 			lastCheckpointId: asString(parsed.last_checkpoint_id),
+			filesTouched: asStringArray(parsed.files_touched),
+			fullyCondensed: asBoolean(parsed.fully_condensed),
+			attachedManually: asBoolean(parsed.attached_manually),
 			agentType: asString(parsed.agent_type),
 			modelName: asString(parsed.model_name),
 			tokenUsage: parseTokenUsage(parsed.token_usage),
@@ -158,6 +216,9 @@ async function readSessionState(filePath: string): Promise<LiveSessionStateRecor
 			contextWindowSize: asNumber(parsed.context_window_size),
 			transcriptPath: asString(parsed.transcript_path),
 			lastPrompt: asString(parsed.last_prompt) ?? asString(parsed.first_prompt),
+			hasShadowBranch: false,
+			isStuck: false,
+			canRunDoctor: false,
 			raw: parsed,
 		};
 	} catch {
@@ -180,10 +241,38 @@ function asNumber(value: unknown): number | undefined {
 	return typeof value === "number" ? value : undefined;
 }
 
+function asBoolean(value: unknown): boolean {
+	return value === true;
+}
+
 function asStringArray(value: unknown): string[] {
 	if (!Array.isArray(value)) {
 		return [];
 	}
 
 	return value.filter((entry): entry is string => typeof entry === "string");
+}
+
+async function shadowBranchExists(repoPath: string, state: Pick<LiveSessionStateRecord, "baseCommit" | "worktreeId">): Promise<boolean> {
+	if (!state.baseCommit) {
+		return false;
+	}
+
+	const shadowBranch = shadowBranchNameForCommit(state.baseCommit, state.worktreeId ?? "");
+	const result = await runCommandAsync("git", ["show-ref", "--verify", "--quiet", `refs/heads/${shadowBranch}`], repoPath);
+	return result.exitCode === 0;
+}
+
+function deriveIsStuck(state: LiveSessionStateRecord, hasShadowBranch: boolean): boolean {
+	const phase = normalizeSessionPhase(state.phase);
+	if (phase === "active") {
+		const lastInteraction = parseTimestamp(state.lastInteractionAt);
+		return lastInteraction === undefined || Date.now() - lastInteraction > STUCK_SESSION_THRESHOLD_MS;
+	}
+
+	if (phase === "ended") {
+		return (state.checkpointCount ?? 0) > 0 && hasShadowBranch;
+	}
+
+	return false;
 }

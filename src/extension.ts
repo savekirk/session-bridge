@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
+import { getGitCommonDir, getGitRepoRoot, tryExecGit } from './checkpoints/util';
 import { probeEntireWorkspace } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
 import { EmptyViewCommands, EmptyViewKind, EmptyViewProvider } from './components/emptyViews';
+import { ActiveSessionTreeViewProvider, type ActiveSessionViewCommands } from './components/activeSessionTreeView';
 import { CheckpointTreeViewProvider, CheckpointViewCommands } from './components/checkpointTreeView';
 import {
 	launchCheckpointRewind,
@@ -71,7 +74,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const outputChannel = vscode.window.createOutputChannel(ENTIRE_OUTPUT_CHANNEL);
 	context.subscriptions.push(outputChannel);
 
-	let workspaceState = await probeEntireWorkspace(getProbeTargetPath());
+	const initialProbeTarget = await resolveProbeTargetPath();
+	let workspaceState = await probeEntireWorkspace(initialProbeTarget);
 	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
 	if (vscode.workspace.workspaceFolders?.length) {
 		statusBarItem.show();
@@ -98,24 +102,110 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	const checkpointProvider = new CheckpointTreeViewProvider(
 		workspaceState,
-		getProbeTargetPath(),
+		initialProbeTarget,
 		checkpointCommands,
 		outputChannel,
 	);
+	const activeSessionCommands = {
+		refresh: COMMAND_ID.REFRESH,
+		showStatus: COMMAND_ID.SHOW_STATUS,
+		explainCheckpoint: COMMAND_ID.EXPLAIN_CHECKPOINT,
+		runDoctor: COMMAND_ID.RUN_DOCTOR,
+	} satisfies ActiveSessionViewCommands;
+	const activeSessionProvider = new ActiveSessionTreeViewProvider(
+		workspaceState,
+		initialProbeTarget,
+		activeSessionCommands,
+		outputChannel,
+	);
 
-	const viewProviders = new Map<string, EmptyViewProvider>();
+	const emptyViewProviders = new Map<string, EmptyViewProvider>();
 	for (const view of VIEW_DEFINITIONS) {
+		if (view.id === 'session.bridge.entire.activeSessions') {
+			context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, activeSessionProvider));
+			continue;
+		}
 		if (view.id === 'session.bridge.entire.checkpoints') {
 			context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, checkpointProvider));
 			continue;
 		}
 		const provider = new EmptyViewProvider(getViewKind(view.id), workspaceState, sharedCommands);
-		viewProviders.set(view.id, provider);
+		emptyViewProviders.set(view.id, provider);
 		context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, provider));
 	}
 
 	const appendCommandRun = (commandId: COMMAND_ID) => {
 		outputChannel.appendLine(`[command] ${COMMAND_TITLES[commandId] ?? commandId}`);
+	};
+
+	let probeWatchers: vscode.Disposable[] = [];
+	let watchedRepoPath: string | undefined;
+	let pendingProbeRefresh: NodeJS.Timeout | undefined;
+
+	const disposeProbeWatchers = () => {
+		for (const disposable of probeWatchers) {
+			disposable.dispose();
+		}
+		probeWatchers = [];
+		watchedRepoPath = undefined;
+	};
+
+	const scheduleProbeRefresh = (reason: string) => {
+		if (pendingProbeRefresh) {
+			clearTimeout(pendingProbeRefresh);
+		}
+
+		pendingProbeRefresh = setTimeout(() => {
+			pendingProbeRefresh = undefined;
+			void refreshWorkspaceProbe(reason);
+		}, 150);
+	};
+
+	const addProbeWatcher = (watcher: vscode.FileSystemWatcher, reason: string) => {
+		probeWatchers.push(
+			watcher,
+			watcher.onDidCreate(() => scheduleProbeRefresh(reason)),
+			watcher.onDidChange(() => scheduleProbeRefresh(reason)),
+			watcher.onDidDelete(() => scheduleProbeRefresh(reason)),
+		);
+	};
+
+	const updateProbeWatchers = async (repoPath: string | undefined) => {
+		if (!repoPath) {
+			disposeProbeWatchers();
+			return;
+		}
+
+		if (watchedRepoPath === repoPath && probeWatchers.length > 0) {
+			return;
+		}
+
+		disposeProbeWatchers();
+		watchedRepoPath = repoPath;
+
+		addProbeWatcher(
+			vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(repoPath, '.entire/settings*.json')),
+			'entire settings changed',
+		);
+
+		const headRelativePath = (await tryExecGit(repoPath, ['rev-parse', '--git-path', 'HEAD']))?.trim();
+		if (headRelativePath) {
+			const headAbsolutePath = path.resolve(repoPath, headRelativePath);
+			addProbeWatcher(
+				vscode.workspace.createFileSystemWatcher(
+					new vscode.RelativePattern(path.dirname(headAbsolutePath), path.basename(headAbsolutePath)),
+				),
+				'git HEAD changed',
+			);
+		}
+
+		const gitCommonDir = await getGitCommonDir(repoPath);
+		if (gitCommonDir) {
+			addProbeWatcher(
+				vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(gitCommonDir, 'entire-sessions/*.json')),
+				'live session state changed',
+			);
+		}
 	};
 
 	const showPlaceholder = async (commandId: COMMAND_ID, message?: string) => {
@@ -141,13 +231,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	};
 
 	const refreshWorkspaceProbe = async (reason: string) => {
-		const cwd = getProbeTargetPath();
+		const cwd = await resolveProbeTargetPath();
 		workspaceState = await probeEntireWorkspace(cwd);
+		await updateProbeWatchers(cwd);
 		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
-		for (const provider of viewProviders.values()) {
+		for (const provider of emptyViewProviders.values()) {
 			provider.setWorkspaceState(workspaceState);
 			provider.refresh();
 		}
+		activeSessionProvider.setWorkspaceState(workspaceState, cwd);
+		activeSessionProvider.refresh();
 		checkpointProvider.setWorkspaceState(workspaceState, cwd);
 		checkpointProvider.refresh();
 
@@ -158,6 +251,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 		outputChannel.appendLine(`[probe] ${reason}: no file-backed workspace target`);
 	};
+
+	await updateProbeWatchers(await resolveProbeTargetPath());
+	context.subscriptions.push({
+		dispose: () => {
+			if (pendingProbeRefresh) {
+				clearTimeout(pendingProbeRefresh);
+				pendingProbeRefresh = undefined;
+			}
+			disposeProbeWatchers();
+		},
+	});
 
 	context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(async (editor) => {
 		if (!isFileBackedEditor(editor)) {
@@ -182,6 +286,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					appendCommandRun(commandId);
 					outputChannel.appendLine(`[command] REFRESH: starting workspace probe`);
 					await refreshWorkspaceProbe('manual refresh');
+					outputChannel.appendLine(`[command] REFRESH: probe done, triggering active session reload`);
+					activeSessionProvider.reload();
 					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
 					checkpointProvider.reload();
 					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
@@ -203,7 +309,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 						await vscode.window.showWarningMessage("Checkpoint detail could not be opened.");
 						return;
 					}
-					const repoPath = getProbeTargetPath();
+					const repoPath = await resolveProbeTargetPath();
 					if (!repoPath) {
 						await vscode.window.showWarningMessage("Open a repository folder to inspect checkpoint details.");
 						return;
@@ -218,7 +324,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 						await vscode.window.showWarningMessage("Raw transcript could not be opened.");
 						return;
 					}
-					const repoPath = getProbeTargetPath();
+					const repoPath = await resolveProbeTargetPath();
 					if (!repoPath) {
 						await vscode.window.showWarningMessage("Open a repository folder to inspect checkpoint details.");
 						return;
@@ -235,7 +341,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 						await vscode.window.showInformationMessage('Select a checkpoint to continue the rewind flow.');
 						return;
 					}
-					const repoPath = getProbeTargetPath();
+					const repoPath = await resolveProbeTargetPath();
 					if (!repoPath) {
 						await vscode.window.showWarningMessage("Open a repository folder to run rewind.");
 						return;
@@ -261,18 +367,42 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 export function deactivate() { }
 
-function getProbeTargetPath(): string | undefined {
+/**
+ * Returns the most specific file-backed path the extension can currently anchor on.
+ *
+ * When an editor is focused, the active file path is preferred because it can
+ * belong to a nested repository that differs from the first workspace folder.
+ * If there is no active file, the first workspace folder path is used as a
+ * broader fallback.
+ *
+ * @returns Active file path when available, otherwise the first workspace folder path.
+ */
+function getProbeCandidatePath(): string | undefined {
 	const activeEditor = vscode.window.activeTextEditor;
 	if (isFileBackedEditor(activeEditor)) {
-		return getWorkspaceFolderPath(activeEditor.document.uri) ?? activeEditor.document.uri.fsPath;
+		return activeEditor.document.uri.fsPath;
 	}
 
 	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 	return workspaceFolder?.uri.fsPath;
 }
 
-function getWorkspaceFolderPath(uri: vscode.Uri): string | undefined {
-	return vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
+/**
+ * Resolves the path the extension should use for repository-backed probes and actions.
+ *
+ * This converts the current active file or workspace folder path into the git
+ * repository root when possible, so active-session loading, checkpoint loading,
+ * and file watchers operate on the repository that actually owns the current context.
+ *
+ * @returns Repository root for the current UI context, or the original candidate path when no git root can be resolved.
+ */
+async function resolveProbeTargetPath(): Promise<string | undefined> {
+	const candidatePath = getProbeCandidatePath();
+	if (!candidatePath) {
+		return undefined;
+	}
+
+	return await getGitRepoRoot(candidatePath) ?? candidatePath;
 }
 
 function isFileBackedEditor(editor: vscode.TextEditor | undefined): editor is vscode.TextEditor {

@@ -1,3 +1,4 @@
+import { constants as fsConstants, promises as fs } from "fs";
 import { runCommandAsync } from "../runCommand";
 import type {
 	CheckpointSummaryRecord,
@@ -7,6 +8,7 @@ import type {
 } from "./types";
 import type {
 	AssociatedCommitModel,
+	EntireActiveSessionCard,
 	CheckpointDateGroup,
 	CheckpointDetailModel,
 	CommitCheckpointGroup,
@@ -28,13 +30,15 @@ import {
 	summarizeFileStats,
 } from "./gitEnrichment";
 import { loadRewindIndex, type NormalizedRewindPoint } from "./rewindIndex";
-import { loadSessionStateIndex, getCheckpointStatus, getSessionStatus, type SessionStateIndex } from "./sessionStateJoin";
+import { loadSessionStateIndex, getCheckpointStatus, getSessionStatus, normalizeSessionStatus, type SessionStateIndex } from "./sessionStateJoin";
 import {
 	NO_DESCRIPTION,
 	collapseWhitespace,
+	compareOptionalTimestampsDesc,
 	formatCheckpointGroupDate,
 	parseTimestamp,
 	promptDescription,
+	sortUnique,
 	shortSha,
 	totalTokenUsage,
 } from "./util";
@@ -111,6 +115,73 @@ export async function listCheckpointSummaries(repoPath: string): Promise<Checkpo
 	}
 
 	return [...statesByTimestamp.values()].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+}
+
+/**
+ * Builds normalized live-session cards for the Active Sessions tree by starting
+ * from live session state and enriching only active-branch checkpoint links.
+ *
+ * @param repoPath Repository root used to load live session state and active-branch git context.
+ * @returns Current-worktree live sessions sorted by most recent interaction.
+ */
+export async function listActiveSessions(repoPath: string): Promise<EntireActiveSessionCard[]> {
+	const [stateIndex, gitEnrichment] = await Promise.all([
+		loadSessionStateIndex(repoPath),
+		buildGitEnrichmentIndex(repoPath),
+	]);
+	const liveSessions = stateIndex.sessions.filter((session) => normalizeSessionStatus(session.phase, session.endedAt) !== "ENDED");
+	if (liveSessions.length === 0) {
+		return [];
+	}
+
+	const commitsByCheckpointId = new Map<string, CheckpointCommit[]>();
+	for (const commit of gitEnrichment.checkpointCommits) {
+		for (const checkpointId of commit.checkpointIds) {
+			const existing = commitsByCheckpointId.get(checkpointId);
+			if (existing) {
+				existing.push(commit);
+			} else {
+				commitsByCheckpointId.set(checkpointId, [commit]);
+			}
+		}
+	}
+
+	const store = new GitCheckpointStore(repoPath);
+	const checkpointIds = sortUnique(
+		liveSessions
+			.map((session) => session.lastCheckpointId)
+			.filter((checkpointId): checkpointId is string => typeof checkpointId === "string" && commitsByCheckpointId.has(checkpointId)),
+	);
+	const checkpoints = new Map<string, LoadedCheckpointRecord>();
+
+	await Promise.all(checkpointIds.map(async (checkpointId) => {
+		const summary = await store.getCheckpointSummary(checkpointId);
+		if (!summary) {
+			return;
+		}
+
+		checkpoints.set(checkpointId, {
+			checkpointId,
+			summary,
+			sessions: await loadSessionsWithRecovery(store, checkpointId, summary),
+			rewindPoints: [],
+			commits: commitsByCheckpointId.get(checkpointId) ?? [],
+		});
+	}));
+
+	const cards = await Promise.all(
+		liveSessions.map(async (session) => buildActiveSessionCard(
+			session,
+			checkpoints.get(session.lastCheckpointId ?? ""),
+			commitsByCheckpointId,
+			await canReadFile(session.transcriptPath),
+		)),
+	);
+
+	return cards.sort((left, right) => compareOptionalTimestampsDesc(
+		left.lastInteractionAt ?? left.startedAt,
+		right.lastInteractionAt ?? right.startedAt,
+	));
 }
 
 /**
@@ -765,6 +836,71 @@ function buildTemporaryDetailModel(
 	};
 }
 
+type LoadedLiveSession = Awaited<ReturnType<typeof loadSessionStateIndex>>["sessions"][number];
+
+function buildActiveSessionCard(
+	liveState: LoadedLiveSession,
+	checkpoint: LoadedCheckpointRecord | undefined,
+	commitsByCheckpointId: Map<string, CheckpointCommit[]>,
+	canOpenTranscript: boolean,
+): EntireActiveSessionCard {
+	const checkpointSession = selectSessionContentForLiveSession(liveState, checkpoint);
+	const associatedCommit = liveState.lastCheckpointId
+		? commitsByCheckpointId.get(liveState.lastCheckpointId)?.[0]
+		: undefined;
+	const directPrompt = collapseWhitespace(liveState.lastPrompt ?? "");
+	const promptPreview = directPrompt.length > 0
+		? directPrompt
+		: selectPromptPreview(
+			checkpointSession?.prompts ?? null,
+			checkpointSession?.transcript ?? null,
+			associatedCommit?.message,
+		);
+	const tokenCount = totalTokenUsage(liveState.tokenUsage)
+		?? totalTokenUsage(checkpointSession?.metadata.tokenUsage)
+		?? totalTokenUsage(checkpoint?.summary?.tokenUsage);
+	const checkpointCount = liveState.checkpointCount
+		?? checkpointSession?.metadata.checkpointsCount
+		?? (liveState.lastCheckpointId ? 1 : 0);
+	const turnCount = liveState.sessionTurnCount ?? checkpointSession?.metadata.sessionMetrics?.turnCount;
+	const durationMs = liveState.sessionDurationMs ?? checkpointSession?.metadata.sessionMetrics?.durationMs;
+
+	return {
+		id: liveState.sessionId,
+		sessionId: liveState.sessionId,
+		status: normalizeSessionStatus(liveState.phase, liveState.endedAt),
+		phase: liveState.phase,
+		promptPreview,
+		agent: liveState.agentType,
+		model: liveState.modelName,
+		startedAt: liveState.startedAt,
+		lastInteractionAt: liveState.lastInteractionAt ?? liveState.startedAt,
+		durationMs,
+		checkpointCount,
+		turnCount,
+		tokenCount,
+		lastCheckpointId: liveState.lastCheckpointId,
+		author: associatedCommit?.authorName,
+		worktreePath: liveState.worktreePath,
+		worktreeId: liveState.worktreeId,
+		baseCommit: liveState.baseCommit,
+		transcriptPath: liveState.transcriptPath,
+		hasShadowBranch: liveState.hasShadowBranch,
+		isStuck: liveState.isStuck,
+		canRunDoctor: liveState.canRunDoctor,
+		canOpenLastCheckpoint: typeof liveState.lastCheckpointId === "string" && liveState.lastCheckpointId.length > 0,
+		canOpenTranscript,
+		searchText: buildSearchText([
+			promptPreview,
+			liveState.sessionId,
+			liveState.lastCheckpointId,
+			liveState.agentType,
+			liveState.modelName,
+			associatedCommit?.authorName,
+		]),
+	};
+}
+
 function selectSessionIds(checkpoint: LoadedCheckpointRecord | undefined): string[] {
 	if (!checkpoint) {
 		return [];
@@ -773,6 +909,31 @@ function selectSessionIds(checkpoint: LoadedCheckpointRecord | undefined): strin
 	return checkpoint.sessions
 		.map((session) => session.metadata.sessionId)
 		.filter((sessionId): sessionId is string => sessionId.length > 0);
+}
+
+function selectSessionContentForLiveSession(
+	liveState: LoadedLiveSession,
+	checkpoint: LoadedCheckpointRecord | undefined,
+): SessionContentRecord | undefined {
+	if (!checkpoint) {
+		return undefined;
+	}
+
+	return checkpoint.sessions.find((session) => session.metadata.sessionId === liveState.sessionId)
+		?? selectLatestSession(checkpoint.sessions);
+}
+
+async function canReadFile(filePath: string | undefined): Promise<boolean> {
+	if (!filePath) {
+		return false;
+	}
+
+	try {
+		await fs.access(filePath, fsConstants.R_OK);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 function rewindAvailabilityForPoint(point: NormalizedRewindPoint): RewindAvailability {

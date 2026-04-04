@@ -4,7 +4,7 @@ import { cpSync, mkdirSync, writeFileSync } from "fs";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { FileSystemCheckpointStore, GitCheckpointStore, countTranscriptToolUses, extractTranscriptPrompt, parseTranscript } from "../../checkpoints";
+import { FileSystemCheckpointStore, GitCheckpointStore, countTranscriptToolUses, extractTranscriptPrompt, getGitRepoRoot, parseTranscript } from "../../checkpoints";
 
 const fixtureRoot = path.resolve(__dirname, "../../../src/test/checkpoints/fixtures/store");
 
@@ -123,6 +123,27 @@ suite("Checkpoint Stores", () => {
 
 				const legacy = await store.getSessionContentById("c6d7e8f9a0b1", "2026-03-30-delta");
 				assert.ok(legacy.transcript?.includes("Legacy log review complete"));
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
+	test("getGitRepoRoot resolves nested file paths to the repository root", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			git(repoDir, ["init"]);
+			git(repoDir, ["config", "user.name", "Test User"]);
+			git(repoDir, ["config", "user.email", "test@example.com"]);
+			const nestedDir = path.join(repoDir, "src", "nested");
+			mkdirSync(nestedDir, { recursive: true });
+			const nestedFile = path.join(nestedDir, "example.ts");
+			writeFileSync(nestedFile, "export const value = 1;\n", "utf8");
+
+			await withGitEnvironment(repoDir, async () => {
+				assert.strictEqual(fs.realpathSync(await getGitRepoRoot(nestedFile) ?? ""), fs.realpathSync(repoDir));
+				assert.strictEqual(fs.realpathSync(await getGitRepoRoot(nestedDir) ?? ""), fs.realpathSync(repoDir));
 			});
 		} finally {
 			fs.rmSync(repoDir, { recursive: true, force: true });

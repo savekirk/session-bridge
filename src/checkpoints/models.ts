@@ -69,6 +69,35 @@ export interface EntireSessionCard {
 	searchText: string;
 }
 
+/** Normalized model for the live active-session tree view. */
+export interface EntireActiveSessionCard {
+	id: string;
+	sessionId: string;
+	status: SessionStatus;
+	phase?: string;
+	promptPreview: string;
+	agent?: string;
+	model?: string;
+	startedAt?: string;
+	lastInteractionAt?: string;
+	durationMs?: number;
+	checkpointCount: number;
+	turnCount?: number;
+	tokenCount?: number;
+	lastCheckpointId?: string;
+	author?: string;
+	worktreePath?: string;
+	worktreeId?: string;
+	baseCommit?: string;
+	transcriptPath?: string;
+	hasShadowBranch: boolean;
+	isStuck: boolean;
+	canRunDoctor: boolean;
+	canOpenLastCheckpoint: boolean;
+	canOpenTranscript: boolean;
+	searchText: string;
+}
+
 /** Normalized model for a checkpoint browser card. */
 export interface EntireCheckpointCard {
 	id: string;

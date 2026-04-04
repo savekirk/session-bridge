@@ -1,4 +1,5 @@
 import { promises as fs } from "fs";
+import { createHash } from "crypto";
 import path from "path";
 import { runCommandAsync } from "../runCommand";
 import type {
@@ -19,11 +20,14 @@ import type {
 export const METADATA_BRANCH_NAME = "entire/checkpoints/v1";
 /** Fallback description used when no usable prompt text is available. */
 export const NO_DESCRIPTION = "No description";
+const SHADOW_BRANCH_PREFIX = "entire/";
+const SHADOW_BRANCH_HASH_LENGTH = 7;
+const WORKTREE_ID_HASH_LENGTH = 6;
 const CHECKPOINT_ID_PATTERN = /^[0-9a-f]{12}$/;
 const PROMPT_SEPARATOR = "\n\n---\n\n";
 
 /**
- * Checks whether a value matches the 12-character lowercase hex checkpoint ID format used by Entire.
+ * Checks whether a value matches the 12-character lowercase hex checkpoint ID format.
  *
  * @param checkpointId Candidate checkpoint ID to test.
  * @returns `true` when the value is a valid checkpoint ID.
@@ -33,7 +37,7 @@ export function isCheckpointId(checkpointId: string | undefined): checkpointId i
 }
 
 /**
- * Validates that a checkpoint ID matches the 12-character hex format used by Entire.
+ * Validates that a checkpoint ID matches the expected 12-character hex format.
  *
  * @param checkpointId Candidate checkpoint ID to validate.
  * @returns Nothing. Throws when the ID is invalid.
@@ -50,7 +54,7 @@ export function validateCheckpointId(checkpointId: string): void {
  * E.g a checkpoint id of `00162eec7c33` will result in `/00/162eec7c33`. 
  *
  * @param checkpointId The 12-character checkpoint ID to shard.
- * @returns The sharded path used by Entire metadata storage.
+ * @returns The sharded metadata path for that checkpoint ID.
  */
 export function shardedCheckpointPath(checkpointId: string): string {
 	validateCheckpointId(checkpointId);
@@ -230,6 +234,32 @@ export async function getGitCommonDir(repoPath: string): Promise<string | null> 
 }
 
 /**
+ * Resolves the top-level git repository root for a file or directory path.
+ *
+ * The extension often starts from an active editor file path or a workspace
+ * folder path, but active-session state must be loaded from the repository that
+ * actually owns that path. This helper normalizes either form to the real git
+ * root so downstream probes, watchers, and state loaders all target the same repo.
+ *
+ * @param candidatePath File or directory path that may be located inside a git repository.
+ * @returns Absolute path to the owning repository root, or `null` when the path is outside any git repo.
+ */
+export async function getGitRepoRoot(candidatePath: string): Promise<string | null> {
+	const gitCwd = await resolveGitCommandCwd(candidatePath);
+	const output = await tryExecGit(gitCwd, ["rev-parse", "--show-toplevel"]);
+	if (!output) {
+		return null;
+	}
+
+	const repoRoot = output.trim();
+	if (!repoRoot) {
+		return null;
+	}
+
+	return path.resolve(gitCwd, repoRoot);
+}
+
+/**
  * Returns the currently checked out branch name, or `null` when detached or unavailable.
  *
  * @param repoPath Repository root used as the git working directory.
@@ -251,6 +281,21 @@ export async function getHeadSha(repoPath: string): Promise<string | null> {
 	const output = await tryExecGit(repoPath, ["rev-parse", "HEAD"]);
 	const sha = output?.trim() ?? "";
 	return sha.length > 0 ? sha : null;
+}
+
+/**
+ * Chooses a safe working directory for git commands from either a file path or directory path.
+ *
+ * @param candidatePath File or directory path passed by higher-level probe logic.
+ * @returns A directory path suitable for use as the cwd of a git subprocess.
+ */
+async function resolveGitCommandCwd(candidatePath: string): Promise<string> {
+	try {
+		const stats = await fs.stat(candidatePath);
+		return stats.isDirectory() ? candidatePath : path.dirname(candidatePath);
+	} catch {
+		return candidatePath;
+	}
 }
 
 /**
@@ -289,6 +334,28 @@ export function shortSha(value: string | undefined, length = 7): string | undefi
 	}
 
 	return value.slice(0, Math.min(length, value.length));
+}
+
+/**
+ * Hashes a worktree identifier into the short suffix used in shadow branch names.
+ *
+ * @param worktreeID Internal git worktree identifier (empty for the main worktree).
+ * @returns Stable 6-character hex hash.
+ */
+export function hashWorktreeId(worktreeID: string): string {
+	return createHash("sha256").update(worktreeID).digest("hex").slice(0, WORKTREE_ID_HASH_LENGTH);
+}
+
+/**
+ * Builds the shadow branch name for a base commit and worktree.
+ *
+ * @param baseCommit Base commit SHA recorded in live session state.
+ * @param worktreeID Internal git worktree identifier (empty for the main worktree).
+ * @returns Shadow branch name like `entire/abcdef0-123456`.
+ */
+export function shadowBranchNameForCommit(baseCommit: string, worktreeID: string): string {
+	const commitPart = baseCommit.slice(0, Math.min(baseCommit.length, SHADOW_BRANCH_HASH_LENGTH));
+	return `${SHADOW_BRANCH_PREFIX}${commitPart}-${hashWorktreeId(worktreeID)}`;
 }
 
 /**

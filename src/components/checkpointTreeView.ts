@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { EntireStatusState, EntireWorkspaceState } from "../workspaceProbe";
-import { CheckpointDateGroup, listCheckpointSummaries, CommitCheckpointGroup, ResolvedCheckpointRef, totalTokenUsage, type CheckpointSummaryModel } from "../checkpoints";
+import { CheckpointDateGroup, listCheckpointSummaries, CommitCheckpointGroup, ResolvedCheckpointRef, totalTokenUsage } from "../checkpoints";
 
 const CONTEXT_CHECKPOINT_COMMITTED = "session-bridge-checkpoint-committed";
 const CONTEXT_CHECKPOINT_EPHEMERAL = "session-bridge-checkpoint-ephemeral";
@@ -9,6 +9,7 @@ const CONTEXT_CHECKPOINT_DETAIL = "session-bridge-checkpoint-detail";
 export interface CheckpointViewCommands {
 	readonly refresh: string;
 	readonly explainCheckpoint: string;
+	readonly explainCommit: string;
 	readonly rewindInteractive: string;
 	readonly openRawTranscript: string;
 }
@@ -46,9 +47,12 @@ export class CheckpointTreeItem extends vscode.TreeItem {
 		this.contextValue = CONTEXT_CHECKPOINT_COMMITTED;
 
 		this.command = {
-			command: commands.explainCheckpoint,
-			title: "Explain Checkpoint",
-			arguments: [card],
+			command: commands.explainCommit,
+			title: "Explain Commit",
+			arguments: [{
+				commitSha: card.commit.sha,
+				checkpointId: selectRepresentativeCheckpoint(card)?.checkpointId,
+			}],
 		};
 	}
 }

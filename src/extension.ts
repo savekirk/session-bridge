@@ -4,7 +4,13 @@ import { probeEntireWorkspace } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
 import { EmptyViewCommands, EmptyViewKind, EmptyViewProvider } from './components/emptyViews';
 import { CheckpointTreeViewProvider, CheckpointViewCommands } from './components/checkpointTreeView';
-import { getCheckpointDetail, getRawTranscript } from './checkpoints';
+import {
+	launchCheckpointRewind,
+	openCheckpointDetailPanel,
+	openCheckpointRawTranscriptPanel,
+	type ExplainPanelTarget,
+	type RewindTarget,
+} from './components/checkpointDetailPanel';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
@@ -85,6 +91,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const checkpointCommands = {
 		refresh: COMMAND_ID.REFRESH,
 		explainCheckpoint: COMMAND_ID.EXPLAIN_CHECKPOINT,
+		explainCommit: COMMAND_ID.EXPLAIN_COMMIT,
 		rewindInteractive: COMMAND_ID.REWIND_INTERACTIVE,
 		openRawTranscript: COMMAND_ID.OPEN_RAW_TRANSCRIPT,
 	} satisfies CheckpointViewCommands;
@@ -188,39 +195,52 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				case COMMAND_ID.EXPLAIN_CHECKPOINT:
 				case COMMAND_ID.EXPLAIN_COMMIT: {
 					appendCommandRun(commandId);
-					const checkpointArg = args[0] as { checkpointId?: unknown } | undefined;
-					if (!checkpointArg || typeof checkpointArg.checkpointId !== "string") {
+					const explainArg = normalizeExplainTarget(args[0]);
+					const hasValidTarget = commandId === COMMAND_ID.EXPLAIN_COMMIT
+						? typeof explainArg.commitSha === "string"
+						: typeof explainArg.checkpointId === "string";
+					if (!hasValidTarget) {
 						await vscode.window.showWarningMessage("Checkpoint detail could not be opened.");
 						return;
 					}
-					const detail = await getCheckpointDetail(getProbeTargetPath() ?? "", checkpointArg.checkpointId);
-					if (!detail) {
-						await vscode.window.showWarningMessage(`Checkpoint ${checkpointArg.checkpointId} could not be resolved.`);
+					const repoPath = getProbeTargetPath();
+					if (!repoPath) {
+						await vscode.window.showWarningMessage("Open a repository folder to inspect checkpoint details.");
 						return;
 					}
-					const panel = vscode.window.createWebviewPanel(
-						'entireExplain',
-						COMMAND_TITLES[commandId],
-						vscode.ViewColumn.Active,
-						{ enableFindWidget: true }
-					);
-					panel.webview.html = renderCheckpointDetailHtml(detail);
+					await openCheckpointDetailPanel(explainArg, { repoPath, outputChannel });
 					return;
 				}
 				case COMMAND_ID.OPEN_RAW_TRANSCRIPT: {
 					appendCommandRun(commandId);
-					const checkpointArg = args[0] as { checkpointId?: unknown; sessionId?: unknown } | undefined;
-					if (!checkpointArg || typeof checkpointArg.checkpointId !== "string") {
+					const explainArg = normalizeExplainTarget(args[0]);
+					if (typeof explainArg.checkpointId !== "string") {
 						await vscode.window.showWarningMessage("Raw transcript could not be opened.");
 						return;
 					}
-					const sessionId = typeof checkpointArg.sessionId === "string" ? checkpointArg.sessionId : undefined;
-					const transcript = await getRawTranscript(getProbeTargetPath() ?? "", checkpointArg.checkpointId, sessionId);
-					const document = await vscode.workspace.openTextDocument({
-						language: 'text',
-						content: transcript ?? 'No raw transcript is available for this checkpoint.\n'
-					});
-					await vscode.window.showTextDocument(document, { preview: false });
+					const repoPath = getProbeTargetPath();
+					if (!repoPath) {
+						await vscode.window.showWarningMessage("Open a repository folder to inspect checkpoint details.");
+						return;
+					}
+					await openCheckpointRawTranscriptPanel(explainArg, { repoPath, outputChannel });
+					return;
+				}
+				case COMMAND_ID.REWIND_INTERACTIVE: {
+					appendCommandRun(commandId);
+					const rewindTarget = normalizeRewindTarget(args[0]);
+					if (typeof rewindTarget.checkpointId !== "string" && typeof rewindTarget.rewindPointId !== "string") {
+						await checkpointProvider.reload();
+						await vscode.commands.executeCommand('session.bridge.entire.checkpoints.focus');
+						await vscode.window.showInformationMessage('Select a checkpoint to continue the rewind flow.');
+						return;
+					}
+					const repoPath = getProbeTargetPath();
+					if (!repoPath) {
+						await vscode.window.showWarningMessage("Open a repository folder to run rewind.");
+						return;
+					}
+					await launchCheckpointRewind(rewindTarget, { repoPath, outputChannel });
 					return;
 				}
 				case COMMAND_ID.SHOW_STATUS: {
@@ -240,82 +260,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export function deactivate() { }
-
-function renderPlaceholderExplainHtml(title: string): string {
-	const escapedTitle = escapeHtml(title);
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapedTitle}</title>
-  <style>
-    :root {
-      color-scheme: light dark;
-    }
-    body {
-      font-family: var(--vscode-font-family);
-      color: var(--vscode-editor-foreground);
-      background: var(--vscode-editor-background);
-      margin: 0;
-      padding: 24px;
-      line-height: 1.5;
-    }
-    h1 {
-      font-size: 1.2rem;
-      margin: 0 0 12px;
-    }
-    p {
-      margin: 0;
-      max-width: 60ch;
-    }
-  </style>
-</head>
-<body>
-  <h1>${escapedTitle}</h1>
-  <p>This is a placeholder panel . CLI-backed explain rendering can be wired in next.</p>
-</body>
-</html>`;
-}
-
-function renderCheckpointDetailHtml(detail: NonNullable<Awaited<ReturnType<typeof getCheckpointDetail>>>): string {
-	const escape = escapeHtml;
-	const files = detail.files.map((file) => `<li>${escape(file.path)}${file.additions !== undefined || file.deletions !== undefined ? ` (${file.additions ?? 0}/${file.deletions ?? 0})` : ""}</li>`).join("");
-	const commits = detail.associatedCommits.map((commit) => `<li><strong>${escape(commit.shortSha)}</strong> ${escape(commit.message)}</li>`).join("");
-	return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escape(detail.title)}</title>
-  <style>
-    body { font-family: var(--vscode-font-family); color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); margin: 0; padding: 24px; line-height: 1.5; }
-    h1 { margin: 0 0 8px; }
-    .meta { opacity: .8; margin-bottom: 20px; }
-    section { margin: 20px 0; }
-    ul { margin: 8px 0 0 20px; }
-    pre { white-space: pre-wrap; }
-  </style>
-</head>
-<body>
-  <h1>${escape(detail.title)}</h1>
-  <div class="meta">${escape(detail.hash)}${detail.primaryCommit ? ` · ${escape(detail.primaryCommit.shortSha)}` : ""}</div>
-  <section><strong>Prompt:</strong> ${escape(detail.promptPreview)}</section>
-  <section><strong>Summary:</strong> ${escape(detail.overview.summary?.intent ?? detail.overview.summary?.outcome ?? "No summary available.")}</section>
-  <section><strong>Commits:</strong><ul>${commits || "<li>No associated commits</li>"}</ul></section>
-  <section><strong>Files:</strong><ul>${files || "<li>No file stats available</li>"}</ul></section>
-</body>
-</html>`;
-}
-
-function escapeHtml(value: string): string {
-	return value
-		.replaceAll('&', '&amp;')
-		.replaceAll('<', '&lt;')
-		.replaceAll('>', '&gt;')
-		.replaceAll('"', '&quot;')
-		.replaceAll("'", '&#39;');
-}
 
 function getProbeTargetPath(): string | undefined {
 	const activeEditor = vscode.window.activeTextEditor;
@@ -348,4 +292,40 @@ function getViewKind(viewId: string): EmptyViewKind {
 	}
 
 	return 'workspace';
+}
+
+function normalizeExplainTarget(value: unknown): ExplainPanelTarget {
+	if (!value || typeof value !== "object") {
+		return {};
+	}
+
+	const candidate = value as {
+		commitSha?: unknown;
+		checkpointId?: unknown;
+		sessionId?: unknown;
+	};
+
+	return {
+		commitSha: typeof candidate.commitSha === "string" ? candidate.commitSha : undefined,
+		checkpointId: typeof candidate.checkpointId === "string" ? candidate.checkpointId : undefined,
+		sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined,
+	};
+}
+
+function normalizeRewindTarget(value: unknown): RewindTarget {
+	if (!value || typeof value !== "object") {
+		return { isLogsOnly: false };
+	}
+
+	const candidate = value as {
+		checkpointId?: unknown;
+		rewindPointId?: unknown;
+		isLogsOnly?: unknown;
+	};
+
+	return {
+		checkpointId: typeof candidate.checkpointId === "string" ? candidate.checkpointId : undefined,
+		rewindPointId: typeof candidate.rewindPointId === "string" ? candidate.rewindPointId : undefined,
+		isLogsOnly: candidate.isLogsOnly === true,
+	};
 }

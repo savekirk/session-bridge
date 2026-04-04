@@ -7,7 +7,9 @@ import * as path from "path";
 import {
 	buildGitEnrichmentIndex,
 	filterSessionCards,
+	getCommitDetail,
 	getCheckpointDetail,
+	getRawExplainOutput,
 	getRawTranscript,
 	listCheckpointCards,
 	listCheckpointSummaries,
@@ -138,24 +140,47 @@ suite("Checkpoint Module", () => {
 				assert.ok(checkpointSummaries.every((group) => group.checkpointCommits.every((commit) => commit.checkpoints.length > 0)));
 
 				const checkpointCards = await listCheckpointCards(repoDir);
-				assert.strictEqual(checkpointCards.length, 1);
+				assert.strictEqual(checkpointCards.length, 3);
 				const committedCard = checkpointCards.find((card) => card.checkpointId === "a3b2c4d5e6f7");
 				assert.ok(committedCard);
-				assert.strictEqual(committedCard.associatedCommitCount, 2);
+				assert.strictEqual(committedCard.associatedCommitCount, 3);
 				assert.strictEqual(committedCard.status, "ACTIVE");
-				assert.strictEqual(committedCard.diffSummary?.filesChanged, 2);
+				assert.strictEqual(committedCard.diffSummary?.filesChanged, 3);
+				const secondaryCard = checkpointCards.find((card) => card.checkpointId === "b4c5d6e7f8a9");
+				assert.ok(secondaryCard);
+				assert.strictEqual(secondaryCard.associatedCommitCount, 1);
+				const temporaryCard = checkpointCards.find((card) => card.rewindPointId === "3333333333333333333333333333333333333333");
+				assert.ok(temporaryCard);
+				assert.strictEqual(temporaryCard.status, "IDLE");
+
 				const sessionCards = await listSessionCards(repoDir);
 				assert.strictEqual(sessionCards.length, 3);
 				const liveOnlySession = sessionCards.find((card) => card.sessionId === "live-only");
 				assert.ok(liveOnlySession);
 				assert.strictEqual(liveOnlySession.status, "IDLE");
-				assert.ok(sessionCards.some((card) => card.sessionId === "2026-03-30-alpha" && card.status === "ACTIVE"));
+				const alphaSession = sessionCards.find((card) => card.sessionId === "2026-03-30-alpha");
+				assert.ok(alphaSession);
+				assert.strictEqual(alphaSession.status, "ACTIVE");
+				assert.strictEqual(alphaSession.checkpointCount, 2);
 
 				const detail = await getCheckpointDetail(repoDir, "a3b2c4d5e6f7");
 				assert.ok(detail);
-				assert.strictEqual(detail?.primaryCommit?.sha, setup.secondCommit);
-				assert.ok((detail?.overview.filesChanged ?? 0) >= 1);
-				assert.ok(detail?.diff.patchText?.includes("Second parser commit"));
+				assert.strictEqual(detail?.primaryCommit?.sha, setup.multiTrailerCommit);
+				assert.strictEqual(detail?.associatedCommits.length, 3);
+				assert.ok(detail?.rawTranscriptAvailable);
+				assert.ok(detail?.diff.patchText?.includes("Squash merged feature work"));
+
+				const secondCommitDetail = await getCommitDetail(repoDir, setup.secondCommit);
+				assert.ok(secondCommitDetail);
+				assert.strictEqual(secondCommitDetail?.commit.sha, setup.secondCommit);
+				assert.strictEqual(secondCommitDetail?.checkpoints.length, 1);
+				assert.ok((secondCommitDetail?.overview.filesChanged ?? 0) >= 1);
+				assert.ok(secondCommitDetail?.diff.patchText?.includes("Second parser commit"));
+
+				const multiCheckpointDetail = await getCommitDetail(repoDir, setup.multiTrailerCommit);
+				assert.ok(multiCheckpointDetail);
+				assert.strictEqual(multiCheckpointDetail?.checkpoints.length, 2);
+				assert.strictEqual(multiCheckpointDetail?.overview.sessionCount, 2);
 
 				const transcript = await getRawTranscript(repoDir, "a3b2c4d5e6f7");
 				assert.ok(transcript?.includes("Review complete"));
@@ -163,9 +188,11 @@ suite("Checkpoint Module", () => {
 				assert.ok(alphaTranscript?.includes("Build the parser"));
 				const chunkedTranscript = await getRawTranscript(repoDir, "c6d7e8f9a0b1");
 				assert.ok(chunkedTranscript?.includes("Chunked transcript complete"));
+				const rawExplain = await getRawExplainOutput(repoDir, { checkpointId: "a3b2c4d5e6f7" });
+				assert.ok(rawExplain?.includes("Explain checkpoint a3b2c4d5e6f7"));
+				const rawFullExplain = await getRawExplainOutput(repoDir, { checkpointId: "a3b2c4d5e6f7", fullTranscript: true });
+				assert.ok(rawFullExplain?.includes("Full transcript for a3b2c4d5e6f7"));
 
-				const filteredCheckpoints = [];//filterCheckpointCards(checkpointCards, { query: "parser", status: "ACTIVE" });
-				assert.strictEqual(filteredCheckpoints.length, 1);
 				const filteredSessions = filterSessionCards(sessionCards, { agent: "Cursor", query: "Investigate" });
 				assert.strictEqual(filteredSessions.length, 1);
 				assert.strictEqual(filteredSessions[0].sessionId, "live-only");
@@ -242,13 +269,21 @@ function git(repoPath: string, args: string[]): string {
 	});
 }
 
-async function withMockEntire<T>(repoPath: string, rewindOutput: string, callback: () => Promise<T>): Promise<T> {
+async function withMockEntire<T>(
+	repoPath: string,
+	rewindOutput: string,
+	callback: () => Promise<T>,
+): Promise<T> {
 	const binDir = path.join(repoPath, ".mock-bin");
 	const mockPath = path.join(binDir, "entire");
 	mkdirSync(binDir, { recursive: true });
 
 	const rewindFile = path.join(binDir, "rewind.json");
+	const explainFile = path.join(binDir, "explain.txt");
+	const explainFullFile = path.join(binDir, "explain-full.txt");
 	writeFileSync(rewindFile, rewindOutput, "utf8");
+	writeFileSync(explainFile, "Explain checkpoint a3b2c4d5e6f7", "utf8");
+	writeFileSync(explainFullFile, "Full transcript for a3b2c4d5e6f7", "utf8");
 	writeFileSync(
 		mockPath,
 		[
@@ -256,6 +291,18 @@ async function withMockEntire<T>(repoPath: string, rewindOutput: string, callbac
 			"if [ \"$1\" = \"rewind\" ] && [ \"$2\" = \"--list\" ]; then",
 			`  cat "${rewindFile}"`,
 			"  exit 0",
+			"fi",
+			"if [ \"$1\" = \"explain\" ]; then",
+			"  case \" $* \" in",
+			"    *\" --full \"*)",
+			`      cat "${explainFullFile}"`,
+			"      exit 0",
+			"      ;;",
+			"    *)",
+			`      cat "${explainFile}"`,
+			"      exit 0",
+			"      ;;",
+			"  esac",
 			"fi",
 			"echo unsupported >&2",
 			"exit 1",

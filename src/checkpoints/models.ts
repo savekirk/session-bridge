@@ -181,3 +181,35 @@ export interface CheckpointDetailModel {
 	rewindAvailability?: RewindAvailability;
 	rawTranscriptAvailable: boolean;
 }
+
+/** Structured detail payload for a commit-centric explain surface. */
+export interface CommitDetailModel {
+	id: string;
+	commit: AssociatedCommitModel;
+	title: string;
+	hash: string;
+	time?: string;
+	user?: string;
+	branch?: string;
+	tokenCount?: number;
+	agent?: string;
+	model?: string;
+	status: SessionStatus;
+	overview: {
+		summary?: SummaryRecord;
+		filesChanged?: number;
+		linesAdded?: number;
+		linesRemoved?: number;
+		sessionCount: number;
+		tokenCount?: number;
+		stepCount?: number;
+		attribution?: InitialAttribution;
+		commitMessage?: string;
+	};
+	files: FileDiffStat[];
+	diff: {
+		patchText?: string;
+		primaryCommitSha?: string;
+	};
+	checkpoints: CheckpointDetailModel[];
+}

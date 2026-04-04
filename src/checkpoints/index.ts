@@ -30,7 +30,15 @@ export {
 export { loadRewindIndex } from "./rewindIndex";
 export { loadSessionStateIndex, normalizeSessionStatus } from "./sessionStateJoin";
 export { filterSessionCards, sortCheckpointCards, sortSessionCards } from "./search";
-export { listCheckpointCards, listCheckpointSummaries, listSessionCards, getCheckpointDetail, getRawTranscript } from "./orchestration";
+export {
+	listCheckpointCards,
+	listCheckpointSummaries,
+	listSessionCards,
+	getCheckpointDetail,
+	getCommitDetail,
+	getRawExplainOutput,
+	getRawTranscript,
+} from "./orchestration";
 export type {
 	CheckpointStore,
 	CheckpointSummaryRecord,
@@ -52,6 +60,7 @@ export type {
 } from "./types";
 export type {
 	AssociatedCommitModel,
+	CommitDetailModel,
 	CheckpointDetailModel,
 	CheckpointSummaryModel,
 	DiffSummaryModel,

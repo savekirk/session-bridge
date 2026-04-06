@@ -45,7 +45,7 @@ suite("Active Session UI", () => {
 		assert.strictEqual(getLabel(items[1]), "Cursor (model-x) · older-sessio…");
 	});
 
-	test("provider renders error and empty states in-tree", async () => {
+	test("provider returns an empty tree when no active sessions but keeps load errors in-tree", async () => {
 		const emptyProvider = new ActiveSessionTreeViewProvider(
 			createWorkspaceState(),
 			"/repo",
@@ -57,8 +57,7 @@ suite("Active Session UI", () => {
 		emptyProvider.getChildren();
 		await emptyLoaded;
 		const emptyItems = emptyProvider.getChildren();
-		assert.strictEqual(getLabel(emptyItems[0]), "No active sessions");
-		assert.strictEqual(emptyItems[1].command?.command, commands.refresh);
+		assert.strictEqual(emptyItems.length, 0);
 
 		const errorProvider = new ActiveSessionTreeViewProvider(
 			createWorkspaceState(),
@@ -136,7 +135,7 @@ suite("Active Session UI", () => {
 		const initialLoaded = waitForTreeChange(provider);
 		provider.getChildren();
 		await initialLoaded;
-		assert.strictEqual(getLabel(provider.getChildren()[0]), "No active sessions");
+		assert.strictEqual(provider.getChildren().length, 0);
 
 		provider.setWorkspaceState(
 			{

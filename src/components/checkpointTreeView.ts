@@ -179,12 +179,12 @@ export class CheckpointTreeViewProvider implements vscode.TreeDataProvider<vscod
 
 		if (this.workspaceState.state !== EntireStatusState.ENABLED) {
 			this.debug(`getChildren: disabled state=${this.workspaceState.state}`);
-			return buildDisabledItems(this.workspaceState, this.commands);
+			return [];
 		}
 
 		if (!this.repoPath) {
 			this.debug("getChildren: no repoPath");
-			return [new EmptyStateItem("No workspace folder", "folder", "Open a folder to see checkpoints.")];
+			return [];
 		}
 
 		this.debug(`getChildren: loadState=${this.loadState.kind}${this.loadState.kind === "loaded" ? `, cards=${this.loadState.cards.length}` : ""}${this.loadState.kind === "error" ? `, error=${this.loadState.message}` : ""}`);
@@ -206,14 +206,7 @@ export class CheckpointTreeViewProvider implements vscode.TreeDataProvider<vscod
 
 			case "loaded": {
 				if (this.loadState.cards.length === 0) {
-					return [
-						new EmptyStateItem(
-							"No checkpoints on this branch",
-							"history",
-							"Committed checkpoints and rewind-only points will appear here.",
-						),
-						buildRefreshAction(this.commands),
-					];
+					return [];
 				}
 				return this.loadState.cards.map((card) => new ToplevelCheckpointTreeItem(card, this.commands));
 			}
@@ -466,24 +459,6 @@ function buildCommitDetailRows(card: CommitCheckpointGroup): Array<{
 
 function selectRepresentativeCheckpoint(card: CommitCheckpointGroup): ResolvedCheckpointRef | undefined {
 	return card.checkpoints.find((entry) => entry.summary !== null) ?? card.checkpoints.at(0);
-}
-
-function buildDisabledItems(
-	workspaceState: EntireWorkspaceState,
-	commands: CheckpointViewCommands,
-): vscode.TreeItem[] {
-	switch (workspaceState.state) {
-		case EntireStatusState.CLI_MISSING:
-			return [new EmptyStateItem("Entire CLI not found", "warning", "Install the Entire CLI and refresh.")];
-		case EntireStatusState.NOT_GIT_REPO:
-			return [new EmptyStateItem("Not a Git repository", "repo", "Open a Git repository to see checkpoints.")];
-		case EntireStatusState.DISABLED:
-		default:
-			return [
-				new EmptyStateItem("Entire not enabled", "circle-slash", "Enable Entire in this repository to see checkpoints."),
-				buildRefreshAction(commands),
-			];
-	}
 }
 
 function buildRefreshAction(commands: CheckpointViewCommands): vscode.TreeItem {

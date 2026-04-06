@@ -147,11 +147,11 @@ export class ActiveSessionTreeViewProvider implements vscode.TreeDataProvider<vs
 		}
 
 		if (this.workspaceState.state !== EntireStatusState.ENABLED) {
-			return buildDisabledItems(this.workspaceState, this.commands);
+			return [];
 		}
 
 		if (!this.repoPath) {
-			return [new EmptyStateItem("No workspace folder", "folder", "Open a folder to see active sessions.")];
+			return [];
 		}
 
 		switch (this.loadState.kind) {
@@ -172,10 +172,7 @@ export class ActiveSessionTreeViewProvider implements vscode.TreeDataProvider<vs
 
 			case "loaded":
 				if (this.loadState.cards.length === 0) {
-					return [
-						new EmptyStateItem("No active sessions", "play-circle", "Current branch session activity will appear here."),
-						buildRefreshAction(this.commands),
-					];
+					return [];
 				}
 
 				return this.loadState.cards.map((card) => new ActiveSessionTreeItem(card));
@@ -302,24 +299,6 @@ function buildSessionChildItems(card: EntireActiveSessionCard, commands: ActiveS
 	}
 
 	return items;
-}
-
-function buildDisabledItems(
-	workspaceState: EntireWorkspaceState,
-	commands: ActiveSessionViewCommands,
-): vscode.TreeItem[] {
-	switch (workspaceState.state) {
-		case EntireStatusState.CLI_MISSING:
-			return [new EmptyStateItem("Entire CLI not found", "warning", "Install the Entire CLI and refresh.")];
-		case EntireStatusState.NOT_GIT_REPO:
-			return [new EmptyStateItem("Not a Git repository", "repo", "Open a Git repository to see active sessions.")];
-		case EntireStatusState.DISABLED:
-		default:
-			return [
-				new EmptyStateItem("Entire not enabled", "circle-slash", "Enable Entire in this repository to see active sessions."),
-				buildRefreshAction(commands),
-			];
-	}
 }
 
 function buildRefreshAction(commands: ActiveSessionViewCommands): vscode.TreeItem {

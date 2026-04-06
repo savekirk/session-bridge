@@ -1,10 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
-import { getGitCommonDir, getGitRepoRoot, tryExecGit } from './checkpoints/util';
-import { probeEntireWorkspace } from './workspaceProbe';
+import { getCurrentBranchName, getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';
+import { EntireStatusState, probeEntireWorkspace } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
-import { EmptyViewCommands, EmptyViewKind, EmptyViewProvider } from './components/emptyViews';
 import { ActiveSessionTreeViewProvider, type ActiveSessionViewCommands } from './components/activeSessionTreeView';
 import { CheckpointTreeViewProvider, CheckpointViewCommands } from './components/checkpointTreeView';
 import {
@@ -14,6 +13,7 @@ import {
 	type ExplainPanelTarget,
 	type RewindTarget,
 } from './components/checkpointDetailPanel';
+import { runCommandAsync } from './runCommand';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
@@ -22,6 +22,7 @@ const enum COMMAND_ID {
 	ENABLE = "session.bridge.entire.enable",
 	DISABLE = "session.bridge.entire.disable",
 	REFRESH = "session.bridge.entire.refresh",
+	FETCH_CHECKPOINT_BRANCH = "session.bridge.entire.fetchCheckpointBranch",
 	BROWSE_CHECKPOINTS = "session.bridge.entire.browseCheckpoints",
 	EXPLAIN_CHECKPOINT = "session.bridge.entire.explainCheckpoint",
 	EXPLAIN_COMMIT = "session.bridge.entire.explainCommit",
@@ -58,6 +59,7 @@ const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.ENABLE]: 'Enable In Repository',
 	[COMMAND_ID.DISABLE]: 'Disable In Repository',
 	[COMMAND_ID.REFRESH]: 'Refresh',
+	[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',
 	[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',
 	[COMMAND_ID.EXPLAIN_CHECKPOINT]: 'Explain Checkpoint',
 	[COMMAND_ID.EXPLAIN_COMMIT]: 'Explain Commit',
@@ -70,27 +72,34 @@ const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.SHOW_TRACE]: 'Show Trace'
 };
 
+
+const WORKSPACE_CONTEXT: [EntireStatusState, string][] = [
+	[EntireStatusState.CLI_MISSING, 'session.bridge.state.cli-missing'],
+	[EntireStatusState.DISABLED, 'session.bridge.state.disabled'],
+	[EntireStatusState.ENABLED, 'session.bridge.state.enabled'],
+	[EntireStatusState.NOT_GIT_REPO, 'session.bridge.state.not-git-repo']
+];
+
+const setWorkspaceContext = async (workspaceState: EntireStatusState) => {
+	for (const context of WORKSPACE_CONTEXT) {
+		const status = context[0] === workspaceState;
+		const key = context[1];
+		await vscode.commands.executeCommand('setContext', key, status);
+	}
+};
+
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 	const outputChannel = vscode.window.createOutputChannel(ENTIRE_OUTPUT_CHANNEL);
 	context.subscriptions.push(outputChannel);
 
 	const initialProbeTarget = await resolveProbeTargetPath();
 	let workspaceState = await probeEntireWorkspace(initialProbeTarget);
+	await setWorkspaceContext(workspaceState.state);
 	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
 	if (vscode.workspace.workspaceFolders?.length) {
 		statusBarItem.show();
 		context.subscriptions.push(statusBarItem);
 	}
-
-	const sharedCommands = {
-		refresh: COMMAND_ID.REFRESH,
-		showStatus: COMMAND_ID.SHOW_STATUS,
-		runDoctor: COMMAND_ID.RUN_DOCTOR,
-		resumeBranch: COMMAND_ID.RESUME_BRANCH,
-		clean: COMMAND_ID.CLEAN,
-		reset: COMMAND_ID.RESET,
-		showTrace: COMMAND_ID.SHOW_TRACE,
-	} satisfies EmptyViewCommands;
 
 	const checkpointCommands = {
 		refresh: COMMAND_ID.REFRESH,
@@ -118,8 +127,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		activeSessionCommands,
 		outputChannel,
 	);
+	const emptyTreeProvider: vscode.TreeDataProvider<vscode.TreeItem> = {
+		getTreeItem(element) {
+			return element;
+		},
+		getChildren() {
+			return [];
+		},
+	};
 
-	const emptyViewProviders = new Map<string, EmptyViewProvider>();
 	for (const view of VIEW_DEFINITIONS) {
 		if (view.id === 'session.bridge.entire.activeSessions') {
 			context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, activeSessionProvider));
@@ -129,9 +145,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, checkpointProvider));
 			continue;
 		}
-		const provider = new EmptyViewProvider(getViewKind(view.id), workspaceState, sharedCommands);
-		emptyViewProviders.set(view.id, provider);
-		context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, provider));
+		context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, emptyTreeProvider));
 	}
 
 	const appendCommandRun = (commandId: COMMAND_ID) => {
@@ -160,6 +174,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			void refreshWorkspaceProbe(reason);
 		}, 150);
 	};
+
 
 	const addProbeWatcher = (watcher: vscode.FileSystemWatcher, reason: string) => {
 		probeWatchers.push(
@@ -233,12 +248,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const refreshWorkspaceProbe = async (reason: string) => {
 		const cwd = await resolveProbeTargetPath();
 		workspaceState = await probeEntireWorkspace(cwd);
+		await setWorkspaceContext(workspaceState.state);
 		await updateProbeWatchers(cwd);
 		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
-		for (const provider of emptyViewProviders.values()) {
-			provider.setWorkspaceState(workspaceState);
-			provider.refresh();
-		}
 		activeSessionProvider.setWorkspaceState(workspaceState, cwd);
 		activeSessionProvider.refresh();
 		checkpointProvider.setWorkspaceState(workspaceState, cwd);
@@ -250,6 +262,45 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		}
 
 		outputChannel.appendLine(`[probe] ${reason}: no file-backed workspace target`);
+	};
+
+	const fetchCheckpointBranch = async () => {
+		appendCommandRun(COMMAND_ID.FETCH_CHECKPOINT_BRANCH);
+		outputChannel.show(true);
+
+		const repoPath = await resolveProbeTargetPath();
+		if (!repoPath) {
+			await vscode.window.showWarningMessage("Open a repository folder to fetch Entire checkpoint metadata.");
+			return;
+		}
+
+		const remoteName = await resolveDefaultRemoteName(repoPath);
+		if (!remoteName) {
+			await vscode.window.showWarningMessage("No Git remote is configured for this repository.");
+			return;
+		}
+
+		outputChannel.appendLine(`[fetch] Attempting ${METADATA_BRANCH_NAME} from ${remoteName}`);
+		const fetchResult = await runCommandAsync(
+			"git",
+			["fetch", remoteName, `refs/heads/${METADATA_BRANCH_NAME}:refs/heads/${METADATA_BRANCH_NAME}`],
+			repoPath,
+		);
+
+		if (fetchResult.exitCode !== 0) {
+			const details = fetchResult.stderr.trim() || fetchResult.stdout.trim() || `exit code ${fetchResult.exitCode}`;
+			outputChannel.appendLine(`[fetch] Failed: ${details}`);
+			await vscode.window.showWarningMessage(
+				`Could not fetch ${METADATA_BRANCH_NAME} from ${remoteName}. ${details}`,
+			);
+			return;
+		}
+
+		outputChannel.appendLine(`[fetch] Fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
+		await refreshWorkspaceProbe(`fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
+		activeSessionProvider.reload();
+		checkpointProvider.reload();
+		await vscode.window.showInformationMessage(`Fetched ${METADATA_BRANCH_NAME} from ${remoteName}.`);
 	};
 
 	await updateProbeWatchers(await resolveProbeTargetPath());
@@ -291,6 +342,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
 					checkpointProvider.reload();
 					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
+					return;
+				case COMMAND_ID.FETCH_CHECKPOINT_BRANCH:
+					await fetchCheckpointBranch();
 					return;
 				case COMMAND_ID.BROWSE_CHECKPOINTS:
 					appendCommandRun(commandId);
@@ -409,19 +463,29 @@ function isFileBackedEditor(editor: vscode.TextEditor | undefined): editor is vs
 	return editor?.document.uri.scheme === 'file';
 }
 
-function getViewKind(viewId: string): EmptyViewKind {
-	switch (viewId) {
-		case 'session.bridge.entire.workspace':
-			return 'workspace';
-		case 'session.bridge.entire.activeSessions':
-			return 'activeSessions';
-		case 'session.bridge.entire.checkpoints':
-			return 'checkpoints';
-		case 'session.bridge.entire.recovery':
-			return 'recovery';
+async function resolveDefaultRemoteName(repoPath: string): Promise<string | null> {
+	const currentBranch = await getCurrentBranchName(repoPath);
+	if (currentBranch) {
+		const branchRemote = (await tryExecGit(repoPath, ["config", "--get", `branch.${currentBranch}.remote`]))?.trim();
+		if (branchRemote) {
+			return branchRemote;
+		}
 	}
 
-	return 'workspace';
+	const remoteOutput = await tryExecGit(repoPath, ["remote"]);
+	if (!remoteOutput) {
+		return null;
+	}
+
+	const remotes = remoteOutput
+		.split(/\r?\n/)
+		.map((entry) => entry.trim())
+		.filter((entry) => entry.length > 0);
+	if (remotes.length === 0) {
+		return null;
+	}
+
+	return remotes.includes("origin") ? "origin" : remotes[0];
 }
 
 function normalizeExplainTarget(value: unknown): ExplainPanelTarget {

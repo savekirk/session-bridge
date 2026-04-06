@@ -1,6 +1,6 @@
 import type { EntireActiveSessionCard } from "./checkpoints";
 import { listActiveSessions } from "./checkpoints";
-import { getGitRepoRoot, tryExecGit } from "./checkpoints/util";
+import { getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from "./checkpoints/util";
 import { EntireBinary, isEntireResolveError, resolveEntireBinary } from "./entireBinaryResolver";
 import { EntireSettings, getEntireSettingsPaths, resolveEntireSettings } from "./entireSettings";
 import { runCommandAsync } from "./runCommand";
@@ -45,6 +45,11 @@ async function isEntireEnabled(cwd?: string): Promise<boolean> {
   }
 
   return false;
+}
+
+async function hasCheckpointMetadataBranch(repoPath: string): Promise<boolean> {
+  const branchRef = await tryExecGit(repoPath, ["show-ref", "--verify", `refs/heads/${METADATA_BRANCH_NAME}`]);
+  return branchRef !== null;
 }
 
 /**
@@ -94,6 +99,10 @@ export async function probeEntireWorkspace(cwd: string | undefined): Promise<Ent
       warnings.push("No Entire settings file found.");
       // fallback to entire status command
       settings.enabled = await isEntireEnabled(repoPath);
+      if (!settings.enabled && await hasCheckpointMetadataBranch(repoPath)) {
+        settings.enabled = true;
+        warnings.push(`Detected local ${METADATA_BRANCH_NAME} branch without checked-in Entire settings.`);
+      }
     }
     workspaceState.settings = settings;
 

@@ -1,0 +1,5 @@
+Can we make the detail checkpoint information to show on the right sidebar instead of be shown like an editor? We want to make sure user can view their code and checpoint details at the same tim e
+
+---
+
+`There is no data provider registered that can provide view data.` error for checkpoint details

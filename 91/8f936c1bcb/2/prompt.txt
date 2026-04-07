@@ -1,1 +1,5 @@
 Get rid of the Recovery tree view and any related codebase since the options are exposed as vscode commands that can be triggered by the user already.
+
+---
+
+Commit the changes

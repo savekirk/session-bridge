@@ -1,0 +1,5 @@
+When a checkpoint is expanded and user clicks on 'Changes` detail item, Open the changes/diff using the integrated git changes view
+
+---
+
+Instead of making changes, add "view diff" detail item that opens the diff, in addition to making the changes item open the diff

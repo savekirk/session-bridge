@@ -39,11 +39,6 @@
           "id": "session.bridge.entire.checkpoints",
           "name": "Checkpoints",
           "icon": "media/dark/history.svg"
-        },
-        {
-          "id": "session.bridge.entire.recovery",
-          "name": "Recovery",
-          "icon": "media/dark/wrench.svg"
         }
       ]
     },
@@ -106,32 +101,12 @@
       {
         "view": "session.bridge.entire.checkpoints",
         "when": "session.bridge.state.disabled",
-        "contents": "Entire checkpoints will appear here after Entire is enabled" 
+        "contents": "Entire checkpoints will appear here after Entire is enabled"
       },
       {
         "view": "session.bridge.entire.checkpoints",
         "when": "session.bridge.state.enabled",
         "contents": "No checkpoints on this branch.\n[Refresh checkpoint state](command:session.bridge.entire.refresh)"
-      },
-      {
-        "view": "session.bridge.entire.recovery",
-        "when": "gitOpenRepositoryCount == 0",
-        "contents": "Recovery actions become available after you open a Git repository."
-      },
-      {
-        "view": "session.bridge.entire.recovery",
-        "when": "gitOpenRepositoryCount != 0 && session.bridge.state.cli-missing",
-        "contents": "Recovery actions become available after Entire is enabled."
-      },
-      {
-        "view": "session.bridge.entire.recovery",
-        "when": "gitOpenRepositoryCount != 0 && session.bridge.state.enabled",
-        "contents": "Recovery actions stay explicit in this view.\n[Run Doctor](command:session.bridge.entire.runDoctor)\n[Resume Branch Session](command:session.bridge.entire.resumeBranch)\n[Clean Entire State](command:session.bridge.entire.clean)\n[Reset Entire Session Data](command:session.bridge.entire.reset)\n[Show Trace](command:session.bridge.entire.showTrace)"
-      },
-      {
-        "view": "session.bridge.entire.recovery",
-        "when": "gitOpenRepositoryCount != 0 && session.bridge.state.disabled",
-        "contents": "Recovery actions become available after Entire is enabled."
       }
     ],
     "commands": [

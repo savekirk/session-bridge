@@ -48,10 +48,6 @@ const VIEW_DEFINITIONS = [
 		id: 'session.bridge.entire.checkpoints',
 		label: 'Checkpoints',
 	},
-	{
-		id: 'session.bridge.entire.recovery',
-		label: 'Recovery',
-	}
 ] as const;
 
 const COMMAND_TITLES: Record<COMMAND_ID, string> = {

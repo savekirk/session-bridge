@@ -90,7 +90,6 @@ export class SessionsTreeItem extends vscode.TreeItem {
 		public readonly card: SessionTreeCard,
 	) {
 		super(buildSessionIdentity(card), vscode.TreeItemCollapsibleState.Collapsed);
-		this.description = card.status;
 		this.tooltip = buildSessionTooltip(card);
 		this.iconPath = new vscode.ThemeIcon(selectSessionIcon(card));
 		this.contextValue = CONTEXT_SESSION;
@@ -387,8 +386,8 @@ function buildSessionIdentity(card: SessionTreeCard): string {
 	const identity = [
 		formatAgentName(card.agent) ?? "Unknown Agent",
 		card.model ? `(${card.model})` : undefined,
-		"·",
-		truncate(card.promptPreview, 40),
+		card.promptPreview === "" ? "" : ".",
+		card.promptPreview,
 	].filter((part): part is string => typeof part === "string");
 
 	return identity.join(" ");
@@ -399,7 +398,7 @@ function buildSessionTooltip(card: SessionTreeCard): vscode.MarkdownString {
 	tooltip.isTrusted = false;
 	tooltip.supportThemeIcons = true;
 
-	tooltip.appendMarkdown(`**Session:** \`${escapeMarkdown(card.sessionId)}\`\n\n`);
+	tooltip.appendMarkdown(`**Session:** ${card.sessionId}\n\n`);
 	tooltip.appendMarkdown(`**Status:** ${escapeMarkdown(card.status)}\n\n`);
 	tooltip.appendMarkdown(`**Prompt:** ${escapeMarkdown(card.promptPreview)}\n\n`);
 	tooltip.appendMarkdown(`**Source:** ${card.kind === "live" ? "Live session" : "Selected checkpoint"}\n\n`);

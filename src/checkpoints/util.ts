@@ -19,7 +19,7 @@ import type {
 /** Name of the branch that stores committed, redacted Entire checkpoint metadata. */
 export const METADATA_BRANCH_NAME = "entire/checkpoints/v1";
 /** Fallback description used when no usable prompt text is available. */
-export const NO_DESCRIPTION = "No description";
+export const NO_DESCRIPTION = "";
 const SHADOW_BRANCH_PREFIX = "entire/";
 const SHADOW_BRANCH_HASH_LENGTH = 7;
 const WORKTREE_ID_HASH_LENGTH = 6;

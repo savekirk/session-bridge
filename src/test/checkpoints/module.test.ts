@@ -228,6 +228,8 @@ suite("Checkpoint Module", () => {
 				assert.ok(activeAlpha);
 				assert.strictEqual(activeAlpha.status, "ACTIVE");
 				assert.strictEqual(activeAlpha.author, "Test User");
+				assert.strictEqual(activeAlpha.attribution?.agentPercentage, 93.3);
+				assert.strictEqual(activeAlpha.attribution?.agentLines, 42);
 				assert.strictEqual(activeAlpha.promptPreview, "Build the parser");
 				assert.strictEqual(activeAlpha.hasShadowBranch, true);
 				assert.strictEqual(activeAlpha.canRunDoctor, true);

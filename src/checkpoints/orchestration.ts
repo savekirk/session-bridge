@@ -961,6 +961,7 @@ function buildActiveSessionCard(
 		checkpointCount,
 		turnCount,
 		tokenCount,
+		attribution: checkpointSession?.metadata.initialAttribution,
 		lastCheckpointId: liveState.lastCheckpointId,
 		author: associatedCommit?.authorName,
 		worktreePath: liveState.worktreePath,

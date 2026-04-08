@@ -84,6 +84,7 @@ export interface EntireActiveSessionCard {
 	checkpointCount: number;
 	turnCount?: number;
 	tokenCount?: number;
+	attribution?: InitialAttribution;
 	lastCheckpointId?: string;
 	author?: string;
 	worktreePath?: string;

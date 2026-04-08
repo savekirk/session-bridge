@@ -1,5 +1,12 @@
 import * as vscode from "vscode";
-import { listActiveSessions, listSessionsForCheckpointIds, type EntireActiveSessionCard, type EntireSessionCard, type SessionStatus } from "../checkpoints";
+import {
+	listActiveSessions,
+	listSessionsForCheckpointIds,
+	type EntireActiveSessionCard,
+	type EntireSessionCard,
+	type InitialAttribution,
+	type SessionStatus,
+} from "../checkpoints";
 import { EntireStatusState, type EntireWorkspaceState } from "../workspaceProbe";
 
 const CONTEXT_SESSION = "session-bridge-session";
@@ -30,6 +37,7 @@ type SessionTreeCard = {
 	startedAt?: string;
 	lastActivityAt?: string;
 	durationMs?: number;
+	attribution?: InitialAttribution;
 	checkpointCount: number;
 	stepCount?: number;
 	turnCount?: number;
@@ -90,6 +98,7 @@ export class SessionsTreeItem extends vscode.TreeItem {
 		public readonly card: SessionTreeCard,
 	) {
 		super(buildSessionIdentity(card), vscode.TreeItemCollapsibleState.Collapsed);
+		this.description = card.status;
 		this.tooltip = buildSessionTooltip(card);
 		this.iconPath = new vscode.ThemeIcon(selectSessionIcon(card));
 		this.contextValue = CONTEXT_SESSION;
@@ -333,6 +342,16 @@ function buildSessionChildItems(card: SessionTreeCard, commands: SessionsViewCom
 		items.push(new SessionDetailItem("Author", card.author, "person"));
 	}
 
+	const attribution = buildAttributionDetail(card.attribution);
+	if (attribution) {
+		items.push(new SessionDetailItem(
+			"Attribution",
+			attribution.description,
+			"pie-chart",
+			attribution.tooltip,
+		));
+	}
+
 	const stats = buildStats(card);
 	if (stats) {
 		items.push(new SessionDetailItem("Stats", stats, "graph"));
@@ -386,7 +405,7 @@ function buildSessionIdentity(card: SessionTreeCard): string {
 	const identity = [
 		formatAgentName(card.agent) ?? "Unknown Agent",
 		card.model ? `(${card.model})` : undefined,
-		card.promptPreview === "" ? "" : ".",
+		card.promptPreview === "" ? "" : "·",
 		card.promptPreview,
 	].filter((part): part is string => typeof part === "string");
 
@@ -418,6 +437,11 @@ function buildSessionTooltip(card: SessionTreeCard): vscode.MarkdownString {
 
 	if (typeof card.tokenCount === "number") {
 		tooltip.appendMarkdown(`**Tokens:** ${formatTokenCount(card.tokenCount)}\n\n`);
+	}
+
+	const attribution = buildAttributionDetail(card.attribution);
+	if (attribution) {
+		tooltip.appendMarkdown(`**Attribution:** ${escapeMarkdown(attribution.description)}\n\n`);
 	}
 
 	if (card.checkpointCount > 0) {
@@ -522,6 +546,29 @@ function buildDurationDetail(card: SessionTreeCard): { description: string; tool
 	};
 }
 
+function buildAttributionDetail(attribution: InitialAttribution | undefined): { description: string; tooltip: string } | undefined {
+	if (!attribution) {
+		return undefined;
+	}
+
+	const description = `${formatPercentage(attribution.agentPercentage)} agent · ${attribution.agentLines}/${attribution.totalCommitted} lines`;
+	const tooltipLines = [
+		`Agent authored: ${attribution.agentLines}/${attribution.totalCommitted} committed lines (${formatPercentage(attribution.agentPercentage)})`,
+		`Human added: ${attribution.humanAdded}`,
+		`Human modified: ${attribution.humanModified}`,
+		`Human removed: ${attribution.humanRemoved}`,
+	];
+
+	if (attribution.calculatedAt) {
+		tooltipLines.push(`Calculated: ${attribution.calculatedAt}`);
+	}
+
+	return {
+		description,
+		tooltip: tooltipLines.join("\n"),
+	};
+}
+
 function resolveDurationMs(card: SessionTreeCard): number | undefined {
 	if (typeof card.durationMs === "number" && Number.isFinite(card.durationMs) && card.durationMs > 0) {
 		return card.durationMs;
@@ -587,6 +634,15 @@ function formatTokenCount(count: number): string {
 	return String(count);
 }
 
+function formatPercentage(value: number): string {
+	if (!Number.isFinite(value)) {
+		return "0%";
+	}
+
+	const fixed = value.toFixed(1);
+	return `${fixed.endsWith(".0") ? fixed.slice(0, -2) : fixed}%`;
+}
+
 function escapeMarkdown(value: string): string {
 	return value.replace(/[\\`*_{}\[\]()#+\-.!|]/g, "\\$&");
 }
@@ -612,6 +668,11 @@ function sameSessionSnapshot(left: EntireActiveSessionCard[], right: EntireActiv
 			|| leftCard?.status !== rightCard?.status
 			|| leftCard?.lastInteractionAt !== rightCard?.lastInteractionAt
 			|| leftCard?.promptPreview !== rightCard?.promptPreview
+			|| leftCard?.lastCheckpointId !== rightCard?.lastCheckpointId
+			|| leftCard?.attribution?.calculatedAt !== rightCard?.attribution?.calculatedAt
+			|| leftCard?.attribution?.agentLines !== rightCard?.attribution?.agentLines
+			|| leftCard?.attribution?.totalCommitted !== rightCard?.attribution?.totalCommitted
+			|| leftCard?.attribution?.agentPercentage !== rightCard?.attribution?.agentPercentage
 		) {
 			return false;
 		}
@@ -682,6 +743,7 @@ function adaptLiveCard(card: EntireActiveSessionCard): SessionTreeCard {
 		startedAt: card.startedAt,
 		lastActivityAt: card.lastInteractionAt,
 		durationMs: card.durationMs,
+		attribution: card.attribution,
 		checkpointCount: card.checkpointCount,
 		turnCount: card.turnCount,
 		tokenCount: card.tokenCount,
@@ -708,6 +770,7 @@ function adaptCheckpointSessionCard(card: EntireSessionCard): SessionTreeCard {
 		startedAt: card.createdAt,
 		lastActivityAt: card.lastActivityAt ?? card.createdAt,
 		durationMs: card.durationMs,
+		attribution: card.attribution,
 		checkpointCount: card.checkpointCount,
 		stepCount: card.stepCount,
 		toolCount: card.toolCount,

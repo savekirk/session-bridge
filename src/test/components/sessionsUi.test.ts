@@ -133,6 +133,15 @@ suite("Sessions UI", () => {
 					createLiveCard({
 						sessionId: "session-with-actions",
 						durationMs: 125_000,
+						attribution: {
+							calculatedAt: "2026-04-04T10:01:00Z",
+							agentLines: 42,
+							humanAdded: 3,
+							humanModified: 1,
+							humanRemoved: 0,
+							totalCommitted: 45,
+							agentPercentage: 93.3,
+						},
 						lastCheckpointId: "a3b2c4d5e6f7",
 						canOpenTranscript: true,
 						transcriptPath,
@@ -159,6 +168,10 @@ suite("Sessions UI", () => {
 		const startedRow = children.find((child) => getLabel(child) === "Started");
 		assert.ok(startedRow);
 		assert.strictEqual(startedRow?.description, formatShortTimestamp("2026-04-04T09:00:00Z"));
+		const attributionRow = children.find((child) => getLabel(child) === "Attribution");
+		assert.ok(attributionRow);
+		assert.strictEqual(attributionRow?.description, "93.3% agent · 42/45 lines");
+		assert.strictEqual(attributionRow?.tooltip, "Agent authored: 42/45 committed lines (93.3%)\nHuman added: 3\nHuman modified: 1\nHuman removed: 0\nCalculated: 2026-04-04T10:01:00Z");
 		assert.strictEqual(children.some((child) => getLabel(child) === "Last Active"), false);
 		const transcriptAction = children.find((child) => getLabel(child) === "Open Live Transcript");
 		assert.ok(transcriptAction);
@@ -191,6 +204,41 @@ suite("Sessions UI", () => {
 		const durationRow = children.find((child) => getLabel(child) === "Duration");
 		assert.ok(durationRow);
 		assert.strictEqual(durationRow?.description, "1h");
+	});
+
+	test("provider child rows expose attribution for checkpoint-backed sessions", async () => {
+		const provider = new SessionsTreeViewProvider(
+			createWorkspaceState(),
+			"/repo",
+			commands,
+			undefined,
+			async () => [],
+			async () => [
+				createCheckpointSessionCard({
+					sessionId: "checkpoint-session-with-attribution",
+					attribution: {
+						calculatedAt: "2026-04-04T11:00:00Z",
+						agentLines: 18,
+						humanAdded: 0,
+						humanModified: 0,
+						humanRemoved: 0,
+						totalCommitted: 18,
+						agentPercentage: 100,
+					},
+				}),
+			],
+		);
+
+		provider.setCheckpointSelection({ checkpointIds: ["a3b2c4d5e6f7"] });
+		const loaded = waitForTreeChange(provider);
+		provider.getChildren();
+		await loaded;
+
+		const [sessionItem] = provider.getChildren();
+		const children = provider.getChildren(sessionItem);
+		const attributionRow = children.find((child) => getLabel(child) === "Attribution");
+		assert.ok(attributionRow);
+		assert.strictEqual(attributionRow?.description, "100% agent · 18/18 lines");
 	});
 
 	test("provider prefers live sessions over checkpoint selection", () => {
@@ -264,6 +312,7 @@ function createLiveCard(overrides: Partial<EntireActiveSessionCard> = {}): Entir
 		checkpointCount: overrides.checkpointCount ?? 2,
 		turnCount: overrides.turnCount ?? 1,
 		tokenCount: overrides.tokenCount ?? 1_500,
+		attribution: overrides.attribution,
 		lastCheckpointId: overrides.lastCheckpointId,
 		author: overrides.author,
 		worktreePath: overrides.worktreePath ?? "/repo",

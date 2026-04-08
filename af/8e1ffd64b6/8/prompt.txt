@@ -1,7 +1,3 @@
-Review all unstagged changes and group them into distinc commit based on sematic meaning and changes.
-
----
-
 # Review findings:
 
 ## Finding 1 (package.json:186-188) [added]

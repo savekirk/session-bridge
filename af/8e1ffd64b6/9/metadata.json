@@ -1,0 +1,37 @@
+{
+  "cli_version": "0.5.3",
+  "checkpoint_id": "af8e1ffd64b6",
+  "session_id": "019d6a5f-5de2-7b00-9f73-652df4bd3c00",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-08T00:10:28.649116Z",
+  "branch": "main",
+  "checkpoints_count": 0,
+  "files_touched": [
+    "src/components/sessionsTreeView.ts",
+    "src/test/components/activeSessionUi.test.ts",
+    "package.json",
+    "src/components/activeSessionTreeView.ts",
+    "src/components/entireStatusBarItem.ts",
+    "src/extension.ts",
+    "src/test/components/checkpointUi.test.ts",
+    "src/test/components/sessionsUi.test.ts",
+    "src/workspaceProbe.ts",
+    "src/components/checkpointDetailPanel.ts",
+    "src/components/checkpointTreeView.ts"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.4-mini",
+  "turn_id": "6fb0ba61bbdb",
+  "initial_attribution": {
+    "calculated_at": "2026-04-08T00:10:28.648306Z",
+    "agent_lines": 0,
+    "agent_removed": 272,
+    "human_added": 0,
+    "human_modified": 1053,
+    "human_removed": 816,
+    "total_committed": 290,
+    "total_lines_changed": 2141,
+    "agent_percentage": 12.704343764595983,
+    "metric_version": 2
+  }
+}

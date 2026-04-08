@@ -118,11 +118,60 @@ export function countTranscriptToolUses(content: string | null): number | undefi
 	return total > 0 ? total : undefined;
 }
 
+/**
+ * Extracts the latest top-level event timestamp from transcript JSONL content without
+ * parsing the entire transcript into normalized events.
+ *
+ * @param content Raw transcript content, or `null` when unavailable.
+ * @returns The latest timestamp string found near the end of the transcript.
+ */
+export function extractTranscriptLatestTimestamp(content: string | null): string | undefined {
+	if (!content) {
+		return undefined;
+	}
+
+	for (const line of iterateTranscriptLinesFromEnd(content)) {
+		const parsed = parseJsonMaybe(line);
+		if (!isJsonObject(parsed)) {
+			continue;
+		}
+
+		const timestamp = readFirstString(parsed, ["timestamp", "ts", "created_at"]);
+		if (timestamp) {
+			return timestamp;
+		}
+	}
+
+	return undefined;
+}
+
 function parseJsonMaybe(text: string): unknown {
 	try {
 		return JSON.parse(text) as unknown;
 	} catch {
 		return undefined;
+	}
+}
+
+function* iterateTranscriptLinesFromEnd(content: string): Generator<string> {
+	let lineEnd = content.length;
+
+	for (let index = content.length - 1; index >= 0; index -= 1) {
+		const char = content[index];
+		if (char !== "\n" && char !== "\r") {
+			continue;
+		}
+
+		const line = content.slice(index + 1, lineEnd).trim();
+		if (line.length > 0) {
+			yield line;
+		}
+		lineEnd = index;
+	}
+
+	const firstLine = content.slice(0, lineEnd).trim();
+	if (firstLine.length > 0) {
+		yield firstLine;
 	}
 }
 

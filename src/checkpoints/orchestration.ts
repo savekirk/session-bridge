@@ -22,7 +22,7 @@ import type {
 } from "./models";
 import { GitCheckpointStore } from "./gitStore";
 import { selectLatestSessionContent, sortSessionContentsByCreatedAtDesc } from "./store";
-import { extractTranscriptPrompt, countTranscriptToolUses } from "./transcript";
+import { extractTranscriptLatestTimestamp, extractTranscriptPrompt, countTranscriptToolUses } from "./transcript";
 import {
 	buildGitEnrichmentIndex,
 	hydrateAssociatedCommits,
@@ -118,7 +118,7 @@ export async function listCheckpointSummaries(repoPath: string): Promise<Checkpo
 }
 
 /**
- * Builds normalized live-session cards for the Active Sessions tree by starting
+ * Builds normalized live-session cards for the Sessions tree by starting
  * from live session state and enriching only active-branch checkpoint links.
  *
  * @param repoPath Repository root used to load live session state and active-branch git context.
@@ -193,94 +193,7 @@ export async function listActiveSessions(repoPath: string): Promise<EntireActive
  */
 export async function listSessionCards(repoPath: string): Promise<EntireSessionCard[]> {
 	const loadedState = await loadModuleState(repoPath, false);
-	const sessionMap = new Map<string, EntireSessionCard>();
-
-	for (const checkpoint of loadedState.checkpoints.values()) {
-		const primaryCommit = checkpoint.commits[0];
-		for (const session of checkpoint.sessions) {
-			const sessionId = session.metadata.sessionId;
-			if (!sessionId) {
-				continue;
-			}
-
-			const existing = sessionMap.get(sessionId);
-			const promptPreview = selectPromptPreview(
-				session.prompts,
-				session.transcript,
-				checkpoint.rewindPoints[0]?.sessionPrompt,
-				checkpoint.summary ? promptDescription(session.prompts) : undefined,
-			);
-			const tokenCount = totalTokenUsage(session.metadata.tokenUsage) ?? totalTokenUsage(checkpoint.summary?.tokenUsage);
-			const toolCount = countTranscriptToolUses(session.transcript);
-			const createdAt = session.metadata.createdAt;
-			const lastActivityAt = createdAt;
-
-			if (!existing) {
-				sessionMap.set(sessionId, {
-					id: sessionId,
-					sessionId,
-					promptPreview,
-					displayHash: checkpoint.checkpointId,
-					checkpointIds: [checkpoint.checkpointId],
-					agent: session.metadata.agent,
-					model: session.metadata.model,
-					status: getSessionStatus(sessionId, loadedState.stateIndex),
-					author: primaryCommit?.authorName,
-					branch: session.metadata.branch,
-					createdAt,
-					lastActivityAt,
-					durationMs: session.metadata.sessionMetrics?.durationMs,
-					stepCount: session.metadata.checkpointsCount,
-					toolCount,
-					tokenCount,
-					attribution: session.metadata.initialAttribution,
-					checkpointCount: 1,
-					latestCheckpointId: checkpoint.checkpointId,
-					latestAssociatedCommitSha: primaryCommit?.sha,
-					isLiveOnly: false,
-					searchText: buildSearchText([
-						promptPreview,
-						checkpoint.checkpointId,
-						primaryCommit?.shortSha,
-						session.metadata.agent,
-						primaryCommit?.authorName,
-					]),
-				});
-				continue;
-			}
-
-			if (!existing.checkpointIds.includes(checkpoint.checkpointId)) {
-				existing.checkpointIds.push(checkpoint.checkpointId);
-				existing.checkpointCount = existing.checkpointIds.length;
-			}
-
-			if (isLater(createdAt, existing.lastActivityAt)) {
-				existing.promptPreview = promptPreview;
-				existing.displayHash = checkpoint.checkpointId;
-				existing.agent = session.metadata.agent ?? existing.agent;
-				existing.model = session.metadata.model ?? existing.model;
-				existing.author = primaryCommit?.authorName ?? existing.author;
-				existing.branch = session.metadata.branch ?? existing.branch;
-				existing.lastActivityAt = lastActivityAt;
-				existing.latestCheckpointId = checkpoint.checkpointId;
-				existing.latestAssociatedCommitSha = primaryCommit?.sha ?? existing.latestAssociatedCommitSha;
-				existing.searchText = buildSearchText([
-					existing.searchText,
-					promptPreview,
-					checkpoint.checkpointId,
-					primaryCommit?.shortSha,
-				]);
-			}
-
-			existing.createdAt = pickEarlier(createdAt, existing.createdAt);
-			existing.durationMs = pickNumber(session.metadata.sessionMetrics?.durationMs, existing.durationMs);
-			existing.stepCount = Math.max(existing.stepCount ?? 0, session.metadata.checkpointsCount);
-			existing.toolCount = sumOptional(existing.toolCount, toolCount);
-			existing.tokenCount = pickNumber(tokenCount, existing.tokenCount);
-			existing.attribution = existing.attribution ?? session.metadata.initialAttribution;
-			existing.status = getSessionStatus(sessionId, loadedState.stateIndex);
-		}
-	}
+	const sessionMap = buildCommittedSessionCardMap(loadedState.checkpoints.values(), loadedState.stateIndex);
 
 	for (const liveState of loadedState.stateIndex.sessions) {
 		const existing = sessionMap.get(liveState.sessionId);
@@ -339,6 +252,69 @@ export async function listSessionCards(repoPath: string): Promise<EntireSessionC
 	}
 
 	return sortSessionCards([...sessionMap.values()]);
+}
+
+/**
+ * Resolves session cards scoped to a selected set of checkpoint IDs.
+ *
+ * Unlike the broader session browser model, this stays anchored to the selected
+ * checkpoint context and does not merge in sessions from unrelated checkpoints
+ * on the active branch.
+ *
+ * @param repoPath Repository root used to load checkpoint metadata and live status overlays.
+ * @param checkpointIds Checkpoint IDs currently selected in the checkpoint tree.
+ * @returns Session cards that belong to the selected checkpoints.
+ */
+export async function listSessionsForCheckpointIds(repoPath: string, checkpointIds: string[]): Promise<EntireSessionCard[]> {
+	const normalizedIds = sortUnique(
+		checkpointIds.filter((checkpointId): checkpointId is string => typeof checkpointId === "string" && checkpointId.length > 0),
+	);
+	if (normalizedIds.length === 0) {
+		return [];
+	}
+
+	const selectedCheckpointIds = new Set(normalizedIds);
+	const [stateIndex, gitEnrichment] = await Promise.all([
+		loadSessionStateIndex(repoPath),
+		buildGitEnrichmentIndex(repoPath),
+	]);
+	const store = new GitCheckpointStore(repoPath);
+	const commitsByCheckpointId = new Map<string, CheckpointCommit[]>();
+
+	for (const commit of gitEnrichment.checkpointCommits) {
+		for (const checkpointId of commit.checkpointIds) {
+			if (!selectedCheckpointIds.has(checkpointId)) {
+				continue;
+			}
+
+			const existing = commitsByCheckpointId.get(checkpointId);
+			if (existing) {
+				existing.push(commit);
+			} else {
+				commitsByCheckpointId.set(checkpointId, [commit]);
+			}
+		}
+	}
+
+	const checkpoints = (await Promise.all(normalizedIds.map<Promise<LoadedCheckpointRecord | null>>(async (checkpointId) => {
+		const summary = await store.getCheckpointSummary(checkpointId);
+		if (!summary) {
+			return null;
+		}
+
+		const checkpoint: LoadedCheckpointRecord = {
+			checkpointId,
+			summary,
+			sessions: await loadSessionsWithRecovery(store, checkpointId, summary),
+			rewindPoints: [],
+			commits: commitsByCheckpointId.get(checkpointId) ?? [],
+		};
+
+		return checkpoint;
+	})))
+		.filter((checkpoint): checkpoint is LoadedCheckpointRecord => checkpoint !== null);
+
+	return sortSessionCards([...buildCommittedSessionCardMap(checkpoints, stateIndex).values()]);
 }
 
 /**
@@ -837,6 +813,102 @@ function buildTemporaryDetailModel(
 }
 
 type LoadedLiveSession = Awaited<ReturnType<typeof loadSessionStateIndex>>["sessions"][number];
+
+function buildCommittedSessionCardMap(
+	checkpoints: Iterable<LoadedCheckpointRecord>,
+	stateIndex: SessionStateIndex,
+): Map<string, EntireSessionCard> {
+	const sessionMap = new Map<string, EntireSessionCard>();
+
+	for (const checkpoint of checkpoints) {
+		const primaryCommit = checkpoint.commits[0];
+		for (const session of checkpoint.sessions) {
+			const sessionId = session.metadata.sessionId;
+			if (!sessionId) {
+				continue;
+			}
+
+			const existing = sessionMap.get(sessionId);
+			const promptPreview = selectPromptPreview(
+				session.prompts,
+				session.transcript,
+				checkpoint.rewindPoints[0]?.sessionPrompt,
+				checkpoint.summary ? promptDescription(session.prompts) : undefined,
+			);
+			const tokenCount = totalTokenUsage(session.metadata.tokenUsage) ?? totalTokenUsage(checkpoint.summary?.tokenUsage);
+			const toolCount = countTranscriptToolUses(session.transcript);
+			const createdAt = session.metadata.createdAt;
+			const lastActivityAt = extractTranscriptLatestTimestamp(session.transcript) ?? createdAt;
+
+			if (!existing) {
+				sessionMap.set(sessionId, {
+					id: sessionId,
+					sessionId,
+					promptPreview,
+					displayHash: checkpoint.checkpointId,
+					checkpointIds: [checkpoint.checkpointId],
+					agent: session.metadata.agent,
+					model: session.metadata.model,
+					status: getSessionStatus(sessionId, stateIndex),
+					author: primaryCommit?.authorName,
+					branch: session.metadata.branch,
+					createdAt,
+					lastActivityAt,
+					durationMs: session.metadata.sessionMetrics?.durationMs,
+					stepCount: session.metadata.checkpointsCount,
+					toolCount,
+					tokenCount,
+					attribution: session.metadata.initialAttribution,
+					checkpointCount: 1,
+					latestCheckpointId: checkpoint.checkpointId,
+					latestAssociatedCommitSha: primaryCommit?.sha,
+					isLiveOnly: false,
+					searchText: buildSearchText([
+						promptPreview,
+						checkpoint.checkpointId,
+						primaryCommit?.shortSha,
+						session.metadata.agent,
+						primaryCommit?.authorName,
+					]),
+				});
+				continue;
+			}
+
+			if (!existing.checkpointIds.includes(checkpoint.checkpointId)) {
+				existing.checkpointIds.push(checkpoint.checkpointId);
+				existing.checkpointCount = existing.checkpointIds.length;
+			}
+
+			if (isLater(createdAt, existing.lastActivityAt)) {
+				existing.promptPreview = promptPreview;
+				existing.displayHash = checkpoint.checkpointId;
+				existing.agent = session.metadata.agent ?? existing.agent;
+				existing.model = session.metadata.model ?? existing.model;
+				existing.author = primaryCommit?.authorName ?? existing.author;
+				existing.branch = session.metadata.branch ?? existing.branch;
+				existing.lastActivityAt = lastActivityAt;
+				existing.latestCheckpointId = checkpoint.checkpointId;
+				existing.latestAssociatedCommitSha = primaryCommit?.sha ?? existing.latestAssociatedCommitSha;
+				existing.searchText = buildSearchText([
+					existing.searchText,
+					promptPreview,
+					checkpoint.checkpointId,
+					primaryCommit?.shortSha,
+				]);
+			}
+
+			existing.createdAt = pickEarlier(createdAt, existing.createdAt);
+			existing.durationMs = pickNumber(session.metadata.sessionMetrics?.durationMs, existing.durationMs);
+			existing.stepCount = Math.max(existing.stepCount ?? 0, session.metadata.checkpointsCount);
+			existing.toolCount = sumOptional(existing.toolCount, toolCount);
+			existing.tokenCount = pickNumber(tokenCount, existing.tokenCount);
+			existing.attribution = existing.attribution ?? session.metadata.initialAttribution;
+			existing.status = getSessionStatus(sessionId, stateIndex);
+		}
+	}
+
+	return sessionMap;
+}
 
 function buildActiveSessionCard(
 	liveState: LoadedLiveSession,

@@ -9,11 +9,13 @@ import {
 	filterSessionCards,
 	getCommitDetail,
 	getCheckpointDetail,
+	GitCheckpointStore,
 	getRawExplainOutput,
 	getRawTranscript,
 	listActiveSessions,
 	listCheckpointCards,
 	listCheckpointSummaries,
+	listSessionsForCheckpointIds,
 	listSessionCards,
 	loadRewindIndex,
 	shadowBranchNameForCommit,
@@ -209,6 +211,16 @@ suite("Checkpoint Module", () => {
 				assert.strictEqual(alphaSession.status, "ACTIVE");
 				assert.strictEqual(alphaSession.checkpointCount, 2);
 
+				const selectedCheckpointSessions = await listSessionsForCheckpointIds(repoDir, ["a3b2c4d5e6f7"]);
+				assert.strictEqual(selectedCheckpointSessions.length, 2);
+				assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "2026-03-30-alpha"), true);
+				assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "2026-03-30-beta"), true);
+				assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "live-only"), false);
+				const selectedAlphaSession = selectedCheckpointSessions.find((card) => card.sessionId === "2026-03-30-alpha");
+				assert.strictEqual(selectedAlphaSession?.lastActivityAt, "2026-03-30T10:01:00Z");
+				const betaSession = selectedCheckpointSessions.find((card) => card.sessionId === "2026-03-30-beta");
+				assert.strictEqual(betaSession?.lastActivityAt, "2026-03-30T11:02:00Z");
+
 				const activeSessions = await listActiveSessions(repoDir);
 				assert.strictEqual(activeSessions.length, 2);
 				const activeAlpha = activeSessions.find((card) => card.sessionId === "2026-03-30-alpha");
@@ -265,6 +277,35 @@ suite("Checkpoint Module", () => {
 				assert.strictEqual(filteredSessions.length, 1);
 				assert.strictEqual(filteredSessions[0].sessionId, "live-only");
 			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
+	test("listSessionsForCheckpointIds only hydrates selected checkpoints", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			createRepoWithMetadata(repoDir);
+			const originalGetCheckpointSummary = GitCheckpointStore.prototype.getCheckpointSummary;
+
+			GitCheckpointStore.prototype.getCheckpointSummary = async function checkpointSummaryGuard(checkpointId: string) {
+				if (checkpointId === "b4c5d6e7f8a9") {
+					throw new Error("unrelated checkpoint should not be read");
+				}
+				return originalGetCheckpointSummary.call(this, checkpointId);
+			};
+
+			try {
+				await withMockEntire(repoDir, "[]", async () => {
+					const selectedCheckpointSessions = await listSessionsForCheckpointIds(repoDir, ["a3b2c4d5e6f7"]);
+					assert.strictEqual(selectedCheckpointSessions.length, 2);
+					assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "2026-03-30-alpha"), true);
+					assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "2026-03-30-beta"), true);
+				});
+			} finally {
+				GitCheckpointStore.prototype.getCheckpointSummary = originalGetCheckpointSummary;
+			}
 		} finally {
 			fs.rmSync(repoDir, { recursive: true, force: true });
 		}

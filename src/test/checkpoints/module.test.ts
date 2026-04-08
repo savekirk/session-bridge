@@ -282,6 +282,32 @@ suite("Checkpoint Module", () => {
 		}
 	});
 
+	test("session cards derive createdAt from transcript start timestamps", async () => {
+		const repoDir = createTempRepo();
+		const customFixtureRoot = cloneFixtureRoot("session-bridge-module-fixtures-");
+
+		try {
+			updateSessionMetadataCreatedAt(customFixtureRoot, path.join("a3", "b2c4d5e6f7", "0", "metadata.json"), "2026-03-30T10:05:00Z");
+			updateSessionMetadataCreatedAt(customFixtureRoot, path.join("b4", "c5d6e7f8a9", "0", "metadata.json"), "2026-03-30T12:04:00Z");
+			createRepoWithMetadata(repoDir, customFixtureRoot);
+
+			await withMockEntire(repoDir, "[]", async () => {
+				const selectedCheckpointSessions = await listSessionsForCheckpointIds(repoDir, ["a3b2c4d5e6f7"]);
+				const selectedAlphaSession = selectedCheckpointSessions.find((card) => card.sessionId === "2026-03-30-alpha");
+				assert.strictEqual(selectedAlphaSession?.createdAt, "2026-03-30T10:00:00Z");
+				assert.strictEqual(selectedAlphaSession?.lastActivityAt, "2026-03-30T10:01:00Z");
+
+				const sessionCards = await listSessionCards(repoDir);
+				const alphaSession = sessionCards.find((card) => card.sessionId === "2026-03-30-alpha");
+				assert.strictEqual(alphaSession?.createdAt, "2026-03-30T10:00:00Z");
+				assert.strictEqual(alphaSession?.lastActivityAt, "2026-03-30T12:04:00Z");
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+			fs.rmSync(customFixtureRoot, { recursive: true, force: true });
+		}
+	});
+
 	test("listSessionsForCheckpointIds only hydrates selected checkpoints", async () => {
 		const repoDir = createTempRepo();
 
@@ -312,7 +338,10 @@ suite("Checkpoint Module", () => {
 	});
 });
 
-function createRepoWithMetadata(repoDir: string): {
+function createRepoWithMetadata(
+	repoDir: string,
+	metadataRoot: string = fixtureRoot,
+): {
 	mainHead: string;
 	secondCommit: string;
 	multiTrailerCommit: string;
@@ -352,7 +381,7 @@ function createRepoWithMetadata(repoDir: string): {
 
 	git(repoDir, ["checkout", "--orphan", "entire/checkpoints/v1"]);
 	git(repoDir, ["rm", "-rf", "."]);
-	cpSync(fixtureRoot, repoDir, { recursive: true });
+	cpSync(metadataRoot, repoDir, { recursive: true });
 	git(repoDir, ["add", "."]);
 	git(repoDir, ["commit", "-m", "Checkpoint metadata"]);
 	git(repoDir, ["checkout", "main"]);
@@ -465,6 +494,19 @@ function gitEnvironment(repoPath: string): NodeJS.ProcessEnv {
 
 function createTempRepo(): string {
 	return fs.mkdtempSync(path.join(os.tmpdir(), "session-bridge-module-"));
+}
+
+function cloneFixtureRoot(prefix: string): string {
+	const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+	cpSync(fixtureRoot, tempRoot, { recursive: true });
+	return tempRoot;
+}
+
+function updateSessionMetadataCreatedAt(rootDir: string, metadataPath: string, createdAt: string): void {
+	const fullPath = path.join(rootDir, metadataPath);
+	const metadata = JSON.parse(fs.readFileSync(fullPath, "utf8")) as { created_at?: string };
+	metadata.created_at = createdAt;
+	writeFileSync(fullPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
 }
 
 function restoreEnv(previous: Record<string, string | undefined>): void {

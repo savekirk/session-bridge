@@ -119,6 +119,33 @@ export function countTranscriptToolUses(content: string | null): number | undefi
 }
 
 /**
+ * Extracts the earliest top-level event timestamp from transcript JSONL content without
+ * parsing the entire transcript into normalized events.
+ *
+ * @param content Raw transcript content, or `null` when unavailable.
+ * @returns The earliest timestamp string found near the start of the transcript.
+ */
+export function extractTranscriptFirstTimestamp(content: string | null): string | undefined {
+	if (!content) {
+		return undefined;
+	}
+
+	for (const line of iterateTranscriptLinesFromStart(content)) {
+		const parsed = parseJsonMaybe(line);
+		if (!isJsonObject(parsed)) {
+			continue;
+		}
+
+		const timestamp = readFirstString(parsed, ["timestamp", "ts", "created_at"]);
+		if (timestamp) {
+			return timestamp;
+		}
+	}
+
+	return undefined;
+}
+
+/**
  * Extracts the latest top-level event timestamp from transcript JSONL content without
  * parsing the entire transcript into normalized events.
  *
@@ -150,6 +177,32 @@ function parseJsonMaybe(text: string): unknown {
 		return JSON.parse(text) as unknown;
 	} catch {
 		return undefined;
+	}
+}
+
+function* iterateTranscriptLinesFromStart(content: string): Generator<string> {
+	let lineStart = 0;
+
+	for (let index = 0; index < content.length; index += 1) {
+		const char = content[index];
+		if (char !== "\n" && char !== "\r") {
+			continue;
+		}
+
+		const line = content.slice(lineStart, index).trim();
+		if (line.length > 0) {
+			yield line;
+		}
+
+		if (char === "\r" && content[index + 1] === "\n") {
+			index += 1;
+		}
+		lineStart = index + 1;
+	}
+
+	const lastLine = content.slice(lineStart).trim();
+	if (lastLine.length > 0) {
+		yield lastLine;
 	}
 }
 

@@ -22,7 +22,12 @@ import type {
 } from "./models";
 import { GitCheckpointStore } from "./gitStore";
 import { selectLatestSessionContent, sortSessionContentsByCreatedAtDesc } from "./store";
-import { extractTranscriptLatestTimestamp, extractTranscriptPrompt, countTranscriptToolUses } from "./transcript";
+import {
+	extractTranscriptFirstTimestamp,
+	extractTranscriptLatestTimestamp,
+	extractTranscriptPrompt,
+	countTranscriptToolUses,
+} from "./transcript";
 import {
 	buildGitEnrichmentIndex,
 	hydrateAssociatedCommits,
@@ -837,8 +842,8 @@ function buildCommittedSessionCardMap(
 			);
 			const tokenCount = totalTokenUsage(session.metadata.tokenUsage) ?? totalTokenUsage(checkpoint.summary?.tokenUsage);
 			const toolCount = countTranscriptToolUses(session.transcript);
-			const createdAt = session.metadata.createdAt;
-			const lastActivityAt = extractTranscriptLatestTimestamp(session.transcript) ?? createdAt;
+			const createdAt = extractTranscriptFirstTimestamp(session.transcript) ?? session.metadata.createdAt;
+			const lastActivityAt = extractTranscriptLatestTimestamp(session.transcript) ?? session.metadata.createdAt ?? createdAt;
 
 			if (!existing) {
 				sessionMap.set(sessionId, {
@@ -879,7 +884,7 @@ function buildCommittedSessionCardMap(
 				existing.checkpointCount = existing.checkpointIds.length;
 			}
 
-			if (isLater(createdAt, existing.lastActivityAt)) {
+			if (isLater(lastActivityAt, existing.lastActivityAt)) {
 				existing.promptPreview = promptPreview;
 				existing.displayHash = checkpoint.checkpointId;
 				existing.agent = session.metadata.agent ?? existing.agent;

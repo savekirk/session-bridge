@@ -1,7 +1,13 @@
 export { BaseCheckpointStore } from "./store";
 export { FileSystemCheckpointStore } from "./fsStore";
 export { GitCheckpointStore } from "./gitStore";
-export { parseTranscript, extractTranscriptPrompt, extractTranscriptLatestTimestamp, countTranscriptToolUses } from "./transcript";
+export {
+	parseTranscript,
+	extractTranscriptPrompt,
+	extractTranscriptFirstTimestamp,
+	extractTranscriptLatestTimestamp,
+	countTranscriptToolUses,
+} from "./transcript";
 export {
 	METADATA_BRANCH_NAME,
 	NO_DESCRIPTION,

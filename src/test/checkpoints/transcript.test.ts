@@ -1,7 +1,13 @@
 import * as assert from "assert";
 import { readFileSync } from "fs";
 import * as path from "path";
-import { countTranscriptToolUses, extractTranscriptLatestTimestamp, extractTranscriptPrompt, parseTranscript } from "../../checkpoints";
+import {
+	countTranscriptToolUses,
+	extractTranscriptFirstTimestamp,
+	extractTranscriptLatestTimestamp,
+	extractTranscriptPrompt,
+	parseTranscript,
+} from "../../checkpoints";
 
 const transcriptFixturePath = path.resolve(
 	__dirname,
@@ -29,6 +35,7 @@ suite("Checkpoint Transcript Parsing", () => {
 			extractTranscriptPrompt(transcript),
 			"Can you inspect the failing CI run and tell me why the fallback agent is erroring?",
 		);
+		assert.strictEqual(extractTranscriptFirstTimestamp(transcript), "2026-03-04T14:02:38.338Z");
 		assert.strictEqual(extractTranscriptLatestTimestamp(transcript), "2026-03-04T14:15:26.911Z");
 		assert.strictEqual(countTranscriptToolUses(transcript), 1);
 	});

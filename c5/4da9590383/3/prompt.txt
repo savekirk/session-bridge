@@ -1,0 +1,1 @@
+For repos with lots of checkpoint, when checkpoint is selected, sessions list shows loading for sometime and crashes. Investigate and fix

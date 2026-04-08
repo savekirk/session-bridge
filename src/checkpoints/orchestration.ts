@@ -20,8 +20,8 @@ import type {
 	SessionStatus,
 	CheckpointCommit,
 } from "./models";
-import { GitCheckpointStore } from "./gitStore";
-import { selectLatestSessionContent, sortSessionContentsByCreatedAtDesc } from "./store";
+import { resolveCheckpointStore } from "./checkpointRemote";
+import { BaseCheckpointStore, selectLatestSessionContent, sortSessionContentsByCreatedAtDesc } from "./store";
 import {
 	extractTranscriptFirstTimestamp,
 	extractTranscriptLatestTimestamp,
@@ -151,12 +151,12 @@ export async function listActiveSessions(repoPath: string): Promise<EntireActive
 		}
 	}
 
-	const store = new GitCheckpointStore(repoPath);
 	const checkpointIds = sortUnique(
 		liveSessions
 			.map((session) => session.lastCheckpointId)
 			.filter((checkpointId): checkpointId is string => typeof checkpointId === "string" && commitsByCheckpointId.has(checkpointId)),
 	);
+	const store = await resolveCheckpointStore(repoPath, { requiredCheckpointIds: checkpointIds });
 	const checkpoints = new Map<string, LoadedCheckpointRecord>();
 
 	await Promise.all(checkpointIds.map(async (checkpointId) => {
@@ -283,7 +283,6 @@ export async function listSessionsForCheckpointIds(repoPath: string, checkpointI
 		loadSessionStateIndex(repoPath),
 		buildGitEnrichmentIndex(repoPath),
 	]);
-	const store = new GitCheckpointStore(repoPath);
 	const commitsByCheckpointId = new Map<string, CheckpointCommit[]>();
 
 	for (const commit of gitEnrichment.checkpointCommits) {
@@ -301,6 +300,7 @@ export async function listSessionsForCheckpointIds(repoPath: string, checkpointI
 		}
 	}
 
+	const store = await resolveCheckpointStore(repoPath, { requiredCheckpointIds: normalizedIds });
 	const checkpoints = (await Promise.all(normalizedIds.map<Promise<LoadedCheckpointRecord | null>>(async (checkpointId) => {
 		const summary = await store.getCheckpointSummary(checkpointId);
 		if (!summary) {
@@ -331,7 +331,10 @@ export async function listSessionsForCheckpointIds(repoPath: string, checkpointI
  * @returns Structured checkpoint details, or `null` when the checkpoint cannot be resolved.
  */
 export async function getCheckpointDetail(repoPath: string, checkpointId: string): Promise<CheckpointDetailModel | null> {
-	const detailContext = await loadDetailContext(repoPath);
+	const detailContext = await loadDetailContext(
+		repoPath,
+		checkpointId.startsWith("temporary:") ? [] : [checkpointId],
+	);
 
 	if (checkpointId.startsWith("temporary:")) {
 		const pointId = checkpointId.slice("temporary:".length);
@@ -362,11 +365,13 @@ export async function getCheckpointDetail(repoPath: string, checkpointId: string
  * @returns Structured commit details, or `null` when the commit cannot be resolved.
  */
 export async function getCommitDetail(repoPath: string, commitSha: string): Promise<CommitDetailModel | null> {
-	const detailContext = await loadDetailContext(repoPath);
-	const commit = detailContext.gitEnrichment.checkpointCommits.find((entry) => entry.sha === commitSha || entry.shortSha === commitSha);
+	const initialDetailContext = await loadDetailContext(repoPath);
+	const commit = initialDetailContext.gitEnrichment.checkpointCommits.find((entry) => entry.sha === commitSha || entry.shortSha === commitSha);
 	if (!commit) {
 		return null;
 	}
+
+	const detailContext = await loadDetailContext(repoPath, commit.checkpointIds);
 
 	const [hydratedCommit] = await hydrateAssociatedCommits(repoPath, [commit], true);
 	if (!hydratedCommit) {
@@ -476,7 +481,7 @@ export async function getRawTranscript(
 	checkpointId: string,
 	sessionId?: string,
 ): Promise<string | null> {
-	const store = new GitCheckpointStore(repoPath);
+	const store = await resolveCheckpointStore(repoPath, { requiredCheckpointIds: [checkpointId] });
 	const summary = await store.getCheckpointSummary(checkpointId);
 	if (!summary) {
 		return null;
@@ -511,11 +516,11 @@ async function loadModuleState(repoPath: string, includePatch: boolean): Promise
 		buildGitEnrichmentIndex(repoPath),
 		loadSessionStateIndex(repoPath),
 	]);
-	const store = new GitCheckpointStore(repoPath);
 	const checkpointIds = new Set<string>([
 		...gitEnrichment.checkpointCommits.flatMap((commit) => commit.checkpointIds),
 		...rewindIndex.byCheckpointId.keys(),
 	]);
+	const store = await resolveCheckpointStore(repoPath, { requiredCheckpointIds: [...checkpointIds] });
 	const checkpoints = new Map<string, LoadedCheckpointRecord>();
 
 	await Promise.all([...checkpointIds].map(async (checkpointId) => {
@@ -563,11 +568,11 @@ async function loadCommitGroupsForTree(repoPath: string): Promise<CommitCheckpoi
 		loadRewindIndex(repoPath),
 		buildGitEnrichmentIndex(repoPath),
 	]);
-	const store = new GitCheckpointStore(repoPath);
 	const checkpointIds = new Set<string>([
 		...gitEnrichment.checkpointCommits.flatMap((commit) => commit.checkpointIds),
 		...rewindIndex.byCheckpointId.keys(),
 	]);
+	const store = await resolveCheckpointStore(repoPath, { requiredCheckpointIds: [...checkpointIds] });
 	const checkpointSummaries = new Map<string, CheckpointSummaryRecord>();
 
 	await Promise.all([...checkpointIds].map(async (checkpointId) => {
@@ -594,10 +599,10 @@ interface DetailContext {
 	gitEnrichment: Awaited<ReturnType<typeof buildGitEnrichmentIndex>>;
 	stateIndex: SessionStateIndex;
 	temporaryRewindPoints: NormalizedRewindPoint[];
-	store: GitCheckpointStore;
+	store: BaseCheckpointStore;
 }
 
-async function loadDetailContext(repoPath: string): Promise<DetailContext> {
+async function loadDetailContext(repoPath: string, requiredCheckpointIds: string[] = []): Promise<DetailContext> {
 	const [rewindIndex, gitEnrichment, stateIndex] = await Promise.all([
 		loadRewindIndex(repoPath),
 		buildGitEnrichmentIndex(repoPath),
@@ -609,7 +614,7 @@ async function loadDetailContext(repoPath: string): Promise<DetailContext> {
 		gitEnrichment,
 		stateIndex,
 		temporaryRewindPoints: rewindIndex.points.filter((point) => point.isTemporary && !point.checkpointId),
-		store: new GitCheckpointStore(repoPath),
+		store: await resolveCheckpointStore(repoPath, { requiredCheckpointIds }),
 	};
 }
 
@@ -1160,7 +1165,7 @@ function selectRepresentativeCheckpointDetail(
 }
 
 async function loadSessionsWithRecovery(
-	store: GitCheckpointStore,
+	store: BaseCheckpointStore,
 	checkpointId: string,
 	summary: CheckpointSummaryRecord,
 ): Promise<SessionContentRecord[]> {

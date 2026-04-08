@@ -4,6 +4,8 @@ export interface CommandInput {
   command: string;
   args?: string[];
   cwd?: string;
+  /** Optional environment overrides passed directly to `child_process.spawn`. */
+  env?: NodeJS.ProcessEnv;
   onSuccess: (data: string) => void;
   onError: (error: string) => void;
   onExit: (code: number | null) => void;
@@ -18,8 +20,8 @@ export interface CommandInput {
  * 
  * @returns {cp.ChildProcessWithoutNullStreams} - The spawn child process
  */
-export const runCommand = ({ command, args = [], cwd, onSuccess, onError, onExit, onSpawnError }: CommandInput): cp.ChildProcessWithoutNullStreams => {
-  const child = cp.spawn(command, args, { cwd });
+export const runCommand = ({ command, args = [], cwd, env, onSuccess, onError, onExit, onSpawnError }: CommandInput): cp.ChildProcessWithoutNullStreams => {
+  const child = cp.spawn(command, args, { cwd, env });
 
   child.stdout.on('data', (data: Buffer) => {
     onSuccess(data.toString());
@@ -53,10 +55,16 @@ export interface CommandResult {
  * @param command - The command to execute
  * @param args - Optional arguments to pass to the command
  * @param cwd - Optional working directory for the command
+ * @param env - Optional environment overrides for the command
  *
  * @returns The accumulated stdout, stderr, and exit code
  */
-export async function runCommandAsync(command: string, args: string[] = [], cwd?: string): Promise<CommandResult> {
+export async function runCommandAsync(
+  command: string,
+  args: string[] = [],
+  cwd?: string,
+  env?: NodeJS.ProcessEnv,
+): Promise<CommandResult> {
   return new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
@@ -75,6 +83,7 @@ export async function runCommandAsync(command: string, args: string[] = [], cwd?
       command,
       args,
       cwd,
+      env,
       onSuccess(data) {
         stdout += data;
       },
@@ -91,4 +100,3 @@ export async function runCommandAsync(command: string, args: string[] = [], cwd?
     });
   });
 }
-

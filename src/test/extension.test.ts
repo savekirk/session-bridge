@@ -12,7 +12,7 @@ suite('Extension Test Suite', () => {
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
 			contributes?: {
 				views?: Record<string, Array<{ id: string }>>;
-				viewsWelcome?: Array<{ view: string }>;
+				viewsWelcome?: Array<{ view: string; contents: string }>;
 				commands?: Array<{ command: string }>;
 			};
 		};
@@ -26,6 +26,10 @@ suite('Extension Test Suite', () => {
 		const welcomeViews = manifest.contributes?.viewsWelcome ?? [];
 		assert.strictEqual(
 			welcomeViews.some((view) => view.view === 'session.bridge.entire.recovery'),
+			false,
+		);
+		assert.strictEqual(
+			welcomeViews.some((view) => view.view === 'session.bridge.entire.checkpoints' && view.contents.includes('session.bridge.entire.fetchCheckpointBranch')),
 			false,
 		);
 

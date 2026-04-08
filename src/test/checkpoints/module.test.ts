@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import {
+	buildCheckpointMirrorRevision,
 	buildGitEnrichmentIndex,
 	filterSessionCards,
 	getCommitDetail,
@@ -308,6 +309,43 @@ suite("Checkpoint Module", () => {
 		}
 	});
 
+	test("module APIs read checkpoint metadata from mirror refs when local metadata branch is absent", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			createRepoWithMetadata(repoDir);
+			writeSettings(repoDir, {
+				enabled: true,
+				strategy_options: {
+					checkpoint_remote: {
+						provider: "github",
+						repo: "org/checkpoints",
+					},
+				},
+			});
+			moveMetadataBranchToMirror(repoDir, buildCheckpointMirrorRevision("github", "org/checkpoints"));
+
+			await withMockEntire(repoDir, "[]", async () => {
+				const localStore = new GitCheckpointStore(repoDir);
+				assert.strictEqual(await localStore.getCheckpointSummary("a3b2c4d5e6f7"), null);
+
+				const checkpointCards = await listCheckpointCards(repoDir);
+				assert.strictEqual(checkpointCards.length, 2);
+				assert.ok(checkpointCards.some((card) => card.checkpointId === "a3b2c4d5e6f7"));
+				assert.ok(checkpointCards.some((card) => card.checkpointId === "b4c5d6e7f8a9"));
+
+				const detail = await getCheckpointDetail(repoDir, "a3b2c4d5e6f7");
+				assert.ok(detail);
+				assert.strictEqual(detail?.associatedCommits.length, 3);
+
+				const transcript = await getRawTranscript(repoDir, "a3b2c4d5e6f7");
+				assert.ok(transcript?.includes("Review complete"));
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
 	test("listSessionsForCheckpointIds only hydrates selected checkpoints", async () => {
 		const repoDir = createTempRepo();
 
@@ -394,6 +432,12 @@ function createRepoWithMetadata(
 	};
 }
 
+function moveMetadataBranchToMirror(repoDir: string, mirrorRef: string): void {
+	const metadataCommit = git(repoDir, ["rev-parse", "refs/heads/entire/checkpoints/v1"]).trim();
+	git(repoDir, ["update-ref", mirrorRef, metadataCommit]);
+	git(repoDir, ["update-ref", "-d", "refs/heads/entire/checkpoints/v1"]);
+}
+
 function writeLiveSessionState(repoDir: string, state: Record<string, unknown>): void {
 	const stateDir = path.join(repoDir, ".git", "entire-sessions");
 	mkdirSync(stateDir, { recursive: true });
@@ -402,6 +446,12 @@ function writeLiveSessionState(repoDir: string, state: Record<string, unknown>):
 
 function createShadowBranch(repoDir: string, branchName: string): void {
 	git(repoDir, ["branch", branchName, "HEAD"]);
+}
+
+function writeSettings(repoDir: string, settings: Record<string, unknown>): void {
+	const settingsDir = path.join(repoDir, ".entire");
+	mkdirSync(settingsDir, { recursive: true });
+	writeFileSync(path.join(settingsDir, "settings.json"), `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
 function git(repoPath: string, args: string[]): string {

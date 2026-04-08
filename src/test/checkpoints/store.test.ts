@@ -4,7 +4,18 @@ import { cpSync, mkdirSync, writeFileSync } from "fs";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { FileSystemCheckpointStore, GitCheckpointStore, countTranscriptToolUses, extractTranscriptPrompt, getGitRepoRoot, parseTranscript } from "../../checkpoints";
+import {
+	buildCheckpointGitEnv,
+	buildCheckpointMirrorRevision,
+	FileSystemCheckpointStore,
+	GitCheckpointStore,
+	countTranscriptToolUses,
+	extractTranscriptPrompt,
+	getGitRepoRoot,
+	parseGitRemoteURL,
+	parseTranscript,
+	resolveCheckpointStore,
+} from "../../checkpoints";
 
 const fixtureRoot = path.resolve(__dirname, "../../../src/test/checkpoints/fixtures/store");
 
@@ -129,6 +140,110 @@ suite("Checkpoint Stores", () => {
 		}
 	});
 
+	test("resolveCheckpointStore reads checkpoint metadata from mirror ref when local branch is missing", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			git(repoDir, ["init"]);
+			git(repoDir, ["config", "user.name", "Test User"]);
+			git(repoDir, ["config", "user.email", "test@example.com"]);
+			git(repoDir, ["checkout", "-b", "main"]);
+
+			writeFileSync(path.join(repoDir, "README.md"), "# temp repo\n", "utf8");
+			git(repoDir, ["add", "README.md"]);
+			git(repoDir, ["commit", "-m", "Initial commit\n\nEntire-Checkpoint: a3b2c4d5e6f7"]);
+
+			installMetadataRef(repoDir, buildCheckpointMirrorRevision("github", "org/checkpoints"));
+			writeSettings(repoDir, {
+				enabled: true,
+				strategy_options: {
+					checkpoint_remote: {
+						provider: "github",
+						repo: "org/checkpoints",
+					},
+				},
+			});
+
+			await withGitEnvironment(repoDir, async () => {
+				const localStore = new GitCheckpointStore(repoDir);
+				assert.strictEqual(await localStore.getCheckpointSummary("a3b2c4d5e6f7"), null);
+
+				const store = await resolveCheckpointStore(repoDir, { requiredCheckpointIds: ["a3b2c4d5e6f7"] });
+				const summary = await store.getCheckpointSummary("a3b2c4d5e6f7");
+				assert.ok(summary);
+				assert.strictEqual(summary?.sessions.length, 2);
+
+				const session = await store.getSessionContentById("a3b2c4d5e6f7", "2026-03-30-alpha");
+				assert.match(session.context ?? "", /Parser context/);
+				assert.match(session.prompts ?? "", /Build the parser/);
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
+	test("resolveCheckpointStore falls back to origin remote-tracking metadata", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			git(repoDir, ["init"]);
+			git(repoDir, ["config", "user.name", "Test User"]);
+			git(repoDir, ["config", "user.email", "test@example.com"]);
+			git(repoDir, ["checkout", "-b", "main"]);
+
+			writeFileSync(path.join(repoDir, "README.md"), "# temp repo\n", "utf8");
+			git(repoDir, ["add", "README.md"]);
+			git(repoDir, ["commit", "-m", "Initial commit\n\nEntire-Checkpoint: a3b2c4d5e6f7"]);
+
+			installMetadataRef(repoDir, "refs/remotes/origin/entire/checkpoints/v1");
+
+			await withGitEnvironment(repoDir, async () => {
+				const localStore = new GitCheckpointStore(repoDir);
+				assert.strictEqual(await localStore.getCheckpointSummary("a3b2c4d5e6f7"), null);
+
+				const store = await resolveCheckpointStore(repoDir, { requiredCheckpointIds: ["a3b2c4d5e6f7"] });
+				const summary = await store.getCheckpointSummary("a3b2c4d5e6f7");
+				assert.ok(summary);
+				assert.strictEqual(summary?.sessions.length, 2);
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
+	test("checkpoint remote helpers preserve CLI auth and parsing behavior", () => {
+		const previousToken = process.env.ENTIRE_CHECKPOINT_TOKEN;
+		process.env.ENTIRE_CHECKPOINT_TOKEN = "secret-token";
+
+		try {
+			const httpsEnv = buildCheckpointGitEnv("https://github.com/org/checkpoints.git", { ...process.env });
+			assert.strictEqual(httpsEnv.GIT_TERMINAL_PROMPT, "0");
+			assert.strictEqual(httpsEnv.GIT_CONFIG_COUNT, "1");
+			assert.strictEqual(httpsEnv.GIT_CONFIG_KEY_0, "http.extraHeader");
+			assert.ok((httpsEnv.GIT_CONFIG_VALUE_0 ?? "").includes("Authorization: Basic "));
+
+			const sshEnv = buildCheckpointGitEnv("git@github.com:org/checkpoints.git", { ...process.env });
+			assert.strictEqual(sshEnv.GIT_TERMINAL_PROMPT, "0");
+			assert.strictEqual(sshEnv.GIT_CONFIG_COUNT, undefined);
+
+			const localEnv = buildCheckpointGitEnv("/tmp/checkpoints.git", { ...process.env });
+			assert.strictEqual(localEnv.GIT_TERMINAL_PROMPT, "0");
+			assert.strictEqual(localEnv.GIT_CONFIG_COUNT, undefined);
+
+			const remoteInfo = parseGitRemoteURL("ssh://git@github.example.com/org/repo.git");
+			assert.strictEqual(remoteInfo.protocol, "ssh");
+			assert.strictEqual(remoteInfo.host, "github.example.com");
+			assert.strictEqual(remoteInfo.owner, "org");
+			assert.strictEqual(remoteInfo.repo, "repo");
+		} finally {
+			if (previousToken === undefined) {
+				delete process.env.ENTIRE_CHECKPOINT_TOKEN;
+			} else {
+				process.env.ENTIRE_CHECKPOINT_TOKEN = previousToken;
+			}
+		}
+	});
+
 	test("getGitRepoRoot resolves nested file paths to the repository root", async () => {
 		const repoDir = createTempRepo();
 
@@ -167,6 +282,27 @@ function git(repoPath: string, args: string[]): string {
 		stdio: ["ignore", "pipe", "pipe"],
 		env: gitEnvironment(repoPath),
 	});
+}
+
+function installMetadataRef(repoDir: string, refName: string): void {
+	const currentBranch = git(repoDir, ["branch", "--show-current"]).trim();
+	const tempBranch = `metadata-${Date.now().toString(16)}`;
+
+	git(repoDir, ["checkout", "--orphan", tempBranch]);
+	git(repoDir, ["rm", "-rf", "."]);
+	cpSync(fixtureRoot, repoDir, { recursive: true });
+	git(repoDir, ["add", "."]);
+	git(repoDir, ["commit", "-m", "Checkpoint metadata"]);
+	const metadataCommit = git(repoDir, ["rev-parse", "HEAD"]).trim();
+	git(repoDir, ["update-ref", refName, metadataCommit]);
+	git(repoDir, ["checkout", currentBranch]);
+	git(repoDir, ["branch", "-D", tempBranch]);
+}
+
+function writeSettings(repoDir: string, settings: Record<string, unknown>): void {
+	const settingsDir = path.join(repoDir, ".entire");
+	mkdirSync(settingsDir, { recursive: true });
+	writeFileSync(path.join(settingsDir, "settings.json"), `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 }
 
 async function withGitEnvironment<T>(repoPath: string, callback: () => Promise<T>): Promise<T> {

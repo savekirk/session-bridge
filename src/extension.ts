@@ -1,8 +1,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
-import { getCurrentBranchName, getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';
-import { EntireStatusState, probeEntireWorkspace } from './workspaceProbe';
+import { getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';
+import { fetchDefaultCheckpointBranch } from './checkpointBranch';
+import { EntireStatusState, probeEntireWorkspace, resetAutomaticCheckpointFetchAttempt } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
 import { SessionsTreeViewProvider, type SessionsViewCommands } from './components/sessionsTreeView';
 import { CheckpointTreeViewProvider, getCheckpointSelectionContext, type CheckpointViewCommands } from './components/checkpointTreeView';
@@ -226,6 +227,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	const refreshWorkspaceProbe = async (reason: string) => {
 		const cwd = await resolveProbeTargetPath();
+		if (reason === 'manual refresh' && cwd) {
+			resetAutomaticCheckpointFetchAttempt(cwd);
+		}
 		workspaceState = await probeEntireWorkspace(cwd);
 		await setWorkspaceContext(workspaceState.state);
 		await updateProbeWatchers(cwd);
@@ -253,21 +257,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			return;
 		}
 
-		const remoteName = await resolveDefaultRemoteName(repoPath);
-		if (!remoteName) {
+		const fetchResult = await fetchDefaultCheckpointBranch(repoPath);
+		if (fetchResult.reason === "no-remote") {
 			await vscode.window.showWarningMessage("No Git remote is configured for this repository.");
 			return;
 		}
 
+		const remoteName = fetchResult.remoteName ?? "unknown remote";
 		outputChannel.appendLine(`[fetch] Attempting ${METADATA_BRANCH_NAME} from ${remoteName}`);
-		const fetchResult = await runCommandAsync(
-			"git",
-			["fetch", remoteName, `refs/heads/${METADATA_BRANCH_NAME}:refs/heads/${METADATA_BRANCH_NAME}`],
-			repoPath,
-		);
 
-		if (fetchResult.exitCode !== 0) {
-			const details = fetchResult.stderr.trim() || fetchResult.stdout.trim() || `exit code ${fetchResult.exitCode}`;
+		if (!fetchResult.fetched) {
+			const details = fetchResult.details ?? "unknown fetch failure";
 			outputChannel.appendLine(`[fetch] Failed: ${details}`);
 			await vscode.window.showWarningMessage(
 				`Could not fetch ${METADATA_BRANCH_NAME} from ${remoteName}. ${details}`,
@@ -426,31 +426,6 @@ async function resolveProbeTargetPath(): Promise<string | undefined> {
 
 function isFileBackedEditor(editor: vscode.TextEditor | undefined): editor is vscode.TextEditor {
 	return editor?.document.uri.scheme === 'file';
-}
-
-async function resolveDefaultRemoteName(repoPath: string): Promise<string | null> {
-	const currentBranch = await getCurrentBranchName(repoPath);
-	if (currentBranch) {
-		const branchRemote = (await tryExecGit(repoPath, ["config", "--get", `branch.${currentBranch}.remote`]))?.trim();
-		if (branchRemote) {
-			return branchRemote;
-		}
-	}
-
-	const remoteOutput = await tryExecGit(repoPath, ["remote"]);
-	if (!remoteOutput) {
-		return null;
-	}
-
-	const remotes = remoteOutput
-		.split(/\r?\n/)
-		.map((entry) => entry.trim())
-		.filter((entry) => entry.length > 0);
-	if (remotes.length === 0) {
-		return null;
-	}
-
-	return remotes.includes("origin") ? "origin" : remotes[0];
 }
 
 async function getBuiltInGitApi(): Promise<GitApi | null> {

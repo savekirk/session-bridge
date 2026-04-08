@@ -56,7 +56,7 @@
       {
         "view": "session.bridge.entire.checkpoints",
         "when": "gitOpenRepositoryCount != 0 && session.bridge.state.disabled",
-        "contents": "Entire is not enabled for this repository.\n[Fetch checkpoint branch](command:session.bridge.entire.fetchCheckpointBranch)\nTo learn more about Entire [read the docs](https://docs.entire.io)"
+        "contents": "Entire is not enabled for this repository.\nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
         "view": "session.bridge.entire.sessions",

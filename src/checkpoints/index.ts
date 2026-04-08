@@ -2,6 +2,14 @@ export { BaseCheckpointStore } from "./store";
 export { FileSystemCheckpointStore } from "./fsStore";
 export { GitCheckpointStore } from "./gitStore";
 export {
+	ResolvedCheckpointStore,
+	buildCheckpointGitEnv,
+	buildCheckpointMirrorRevision,
+	parseGitRemoteURL,
+	resolveCheckpointRemoteTarget,
+	resolveCheckpointStore,
+} from "./checkpointRemote";
+export {
 	parseTranscript,
 	extractTranscriptPrompt,
 	extractTranscriptFirstTimestamp,

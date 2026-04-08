@@ -10,8 +10,7 @@ import { runCommandAsync } from './runCommand';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
-const WORKSPACE_VIEW_ID = 'session.bridge.entire.workspace';
-const SESSIONS_VIEW_ID = 'session.bridge.entire.activeSessions';
+const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';
 const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';
 const enum COMMAND_ID {
 	SHOW_STATUS = "session.bridge.entire.showStatus",
@@ -29,7 +28,6 @@ const enum COMMAND_ID {
 }
 
 const TREE_VIEW_IDS = [
-	WORKSPACE_VIEW_ID,
 	SESSIONS_VIEW_ID,
 	CHECKPOINTS_VIEW_ID,
 ] as const;
@@ -118,16 +116,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		sessionCommands,
 		outputChannel,
 	);
-	const emptyTreeProvider: vscode.TreeDataProvider<vscode.TreeItem> = {
-		getTreeItem(element) {
-			return element;
-		},
-		getChildren() {
-			return [];
-		},
-	};
 
-	context.subscriptions.push(vscode.window.registerTreeDataProvider(WORKSPACE_VIEW_ID, emptyTreeProvider));
 	context.subscriptions.push(vscode.window.registerTreeDataProvider(SESSIONS_VIEW_ID, sessionsProvider));
 	const checkpointTreeView = vscode.window.createTreeView(CHECKPOINTS_VIEW_ID, {
 		treeDataProvider: checkpointProvider,

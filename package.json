@@ -1,7 +1,7 @@
 {
   "name": "session-bridge",
   "displayName": "Session Bridge",
-  "description": "Unofficial VSCode extension for managing Entire sessions, checkpoints, and workspace state",
+  "description": "Unofficial VSCode extension for inspecting and managing Entire sessions and checkpoints",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.110.0"
@@ -26,17 +26,12 @@
     "views": {
       "session-bridge": [
         {
-          "id": "session.bridge.entire.workspace",
-          "name": "Workspace",
-          "icon": "media/logo.png"
-        },
-        {
           "id": "session.bridge.entire.checkpoints",
           "name": "Checkpoints",
           "icon": "media/dark/history.svg"
         },
         {
-          "id": "session.bridge.entire.activeSessions",
+          "id": "session.bridge.entire.sessions",
           "name": "Sessions",
           "icon": "media/dark/play.svg"
         }
@@ -44,64 +39,44 @@
     },
     "viewsWelcome": [
       {
-        "view": "session.bridge.entire.workspace",
+        "view": "session.bridge.entire.checkpoints",
         "when": "gitOpenRepositoryCount == 0",
-        "contents": "Open a Git repository to inspect Entire workspace state.\n[Open Folder](command:vscode.openFolder)"
+        "contents": "Open a Git repository to view Entire checkpoints.\n[Open Folder](command:vscode.openFolder)\nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
-        "view": "session.bridge.entire.workspace",
+        "view": "session.bridge.entire.checkpoints",
         "when": "gitOpenRepositoryCount != 0 && session.bridge.state.cli-missing",
-        "contents": "The Entire CLI is not available in the extension host environment.\n[Refresh workspace state](command:session.bridge.entire.refresh) \nTo learn more about Entire [read the docs](https://docs.entire.io)"
+        "contents": "The Entire CLI is not available in the extension host environment.\nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
-        "view": "session.bridge.entire.workspace",
+        "view": "session.bridge.entire.checkpoints",
         "when": "gitOpenRepositoryCount != 0 && session.bridge.state.not-git-repo",
-        "contents": "Entire features require a Git repository.\n[Open Folder](command:vscode.openFolder)"
+        "contents": "Entire features require a Git repository.\n[Open Folder](command:vscode.openFolder)\nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
-        "view": "session.bridge.entire.workspace",
+        "view": "session.bridge.entire.checkpoints",
         "when": "gitOpenRepositoryCount != 0 && session.bridge.state.disabled",
-        "contents": "Entire is not enabled for this repository.\n[Fetch checkpoint branch](command:session.bridge.entire.fetchCheckpointBranch)\n[Refresh workspace state](command:session.bridge.entire.refresh)"
+        "contents": "Entire is not enabled for this repository.\n[Fetch checkpoint branch](command:session.bridge.entire.fetchCheckpointBranch)\nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
-        "view": "session.bridge.entire.workspace",
-        "when": "gitOpenRepositoryCount != 0 && session.bridge.state.enabled",
-        "contents": "Entire is enabled for this repository.\n[Browse Checkpoints](command:session.bridge.entire.browseCheckpoints)\n[Refresh workspace state](command:session.bridge.entire.refresh)\nTo learn more about Entire [read the docs](https://docs.entire.io)"
-      },
-      {
-        "view": "session.bridge.entire.activeSessions",
+        "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.not-git-repo",
         "contents": "Open a Git repository to see sessions."
       },
       {
-        "view": "session.bridge.entire.activeSessions",
+        "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.cli-missing",
         "contents": "Sessions will appear here after Entire is installed and enabled."
       },
       {
-        "view": "session.bridge.entire.activeSessions",
+        "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.disabled",
         "contents": "Sessions will appear here after Entire is enabled."
       },
       {
-        "view": "session.bridge.entire.activeSessions",
+        "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.enabled",
         "contents": "Live sessions appear here automatically. When none are running, select a checkpoint to inspect its sessions.\n[Refresh session state](command:session.bridge.entire.refresh)"
-      },
-      {
-        "view": "session.bridge.entire.checkpoints",
-        "when": "session.bridge.state.not-git-repo",
-        "contents": "Open a Git repository to see checkpoints."
-      },
-      {
-        "view": "session.bridge.entire.checkpoints",
-        "when": "session.bridge.state.cli-missing",
-        "contents": "Entire checkpoints will appear here after Entire cli is installed and Enabled."
-      },
-      {
-        "view": "session.bridge.entire.checkpoints",
-        "when": "session.bridge.state.disabled",
-        "contents": "Entire checkpoints will appear here after Entire is enabled"
       },
       {
         "view": "session.bridge.entire.checkpoints",

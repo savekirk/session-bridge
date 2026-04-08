@@ -463,6 +463,15 @@ function buildCommitDetailRows(card: CommitCheckpointGroup): Array<{
 		changeParts.push(`${summary.filesTouched.length} file(s)`);
 	}
 
+	const tokenCount = summary ? totalTokenUsage(summary.tokenUsage) : undefined;
+	if (typeof tokenCount === "number") {
+		rows.push({
+			label: "Tokens",
+			description: formatTokenCount(tokenCount),
+			icon: "symbol-number",
+		});
+	}
+
 	if (changeParts.length > 0) {
 		rows.push({
 			label: "Changes",
@@ -478,14 +487,6 @@ function buildCommitDetailRows(card: CommitCheckpointGroup): Array<{
 		});
 	}
 
-	const tokenCount = summary ? totalTokenUsage(summary.tokenUsage) : undefined;
-	if (typeof tokenCount === "number") {
-		rows.push({
-			label: "Tokens",
-			description: formatTokenCount(tokenCount),
-			icon: "symbol-number",
-		});
-	}
 
 	return rows;
 }

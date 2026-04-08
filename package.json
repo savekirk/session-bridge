@@ -1,7 +1,7 @@
 {
   "name": "session-bridge",
   "displayName": "Session Bridge",
-  "description": "Unofficial VSCode extension for managing Entire sessions, checkpoints, and recovery workflows",
+  "description": "Unofficial VSCode extension for managing Entire sessions, checkpoints, and workspace state",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.110.0"
@@ -31,14 +31,14 @@
           "icon": "media/logo.png"
         },
         {
-          "id": "session.bridge.entire.activeSessions",
-          "name": "Active Sessions",
-          "icon": "media/dark/play.svg"
-        },
-        {
           "id": "session.bridge.entire.checkpoints",
           "name": "Checkpoints",
           "icon": "media/dark/history.svg"
+        },
+        {
+          "id": "session.bridge.entire.activeSessions",
+          "name": "Sessions",
+          "icon": "media/dark/play.svg"
         }
       ]
     },
@@ -51,7 +51,7 @@
       {
         "view": "session.bridge.entire.workspace",
         "when": "gitOpenRepositoryCount != 0 && session.bridge.state.cli-missing",
-        "contents": "The Entire CLI is not available in the extension host environment.\n[Refresh workspace state](command:session.bridge.entire.refresh) \n[Read the Entire documentation](https://docs.entire.io)"
+        "contents": "The Entire CLI is not available in the extension host environment.\n[Refresh workspace state](command:session.bridge.entire.refresh) \nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
         "view": "session.bridge.entire.workspace",
@@ -66,27 +66,27 @@
       {
         "view": "session.bridge.entire.workspace",
         "when": "gitOpenRepositoryCount != 0 && session.bridge.state.enabled",
-        "contents": "Entire is enabled for this repository.\n[Browse Checkpoints](command:session.bridge.entire.browseCheckpoints)\n[Refresh workspace state](command:session.bridge.entire.refresh)\n[Read the Entire documentation](https://docs.entire.io)"
+        "contents": "Entire is enabled for this repository.\n[Browse Checkpoints](command:session.bridge.entire.browseCheckpoints)\n[Refresh workspace state](command:session.bridge.entire.refresh)\nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
         "view": "session.bridge.entire.activeSessions",
         "when": "session.bridge.state.not-git-repo",
-        "contents": "Open a Git repository to see active sessions."
+        "contents": "Open a Git repository to see sessions."
       },
       {
         "view": "session.bridge.entire.activeSessions",
         "when": "session.bridge.state.cli-missing",
-        "contents": "Sessions will appear here after Entire cli is installed and Enabled."
+        "contents": "Sessions will appear here after Entire is installed and enabled."
       },
       {
         "view": "session.bridge.entire.activeSessions",
         "when": "session.bridge.state.disabled",
-        "contents": "Entire Sessions will appear here after Entire is Enabled."
+        "contents": "Sessions will appear here after Entire is enabled."
       },
       {
         "view": "session.bridge.entire.activeSessions",
         "when": "session.bridge.state.enabled",
-        "contents": "No active sessions.\n[Refresh session state](command:session.bridge.entire.refresh)"
+        "contents": "Live sessions appear here automatically. When none are running, select a checkpoint to inspect its sessions.\n[Refresh session state](command:session.bridge.entire.refresh)"
       },
       {
         "view": "session.bridge.entire.checkpoints",
@@ -141,26 +141,6 @@
         "category": "Session Bridge (Entire)"
       },
       {
-        "command": "session.bridge.entire.explainCheckpoint",
-        "title": "Explain Checkpoint",
-        "category": "Session Bridge (Entire)"
-      },
-      {
-        "command": "session.bridge.entire.explainCommit",
-        "title": "Explain Commit",
-        "category": "Session Bridge (Entire)"
-      },
-      {
-        "command": "session.bridge.entire.openRawTranscript",
-        "title": "Open Raw Transcript",
-        "category": "Session Bridge (Entire)"
-      },
-      {
-        "command": "session.bridge.entire.rewindInteractive",
-        "title": "Rewind To Checkpoint",
-        "category": "Session Bridge (Entire)"
-      },
-      {
         "command": "session.bridge.entire.resumeBranch",
         "title": "Resume Branch Session",
         "category": "Session Bridge (Entire)"
@@ -203,7 +183,7 @@
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "pnpm run check-types && pnpm run lint && node esbuild.js --production",
-    "compile-tests": "tsc -p . --outDir out",
+    "compile-tests": "node -e \"require('node:fs').rmSync('out', { recursive: true, force: true })\" && tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "pnpm run compile-tests && pnpm run compile && pnpm run lint",
     "check-types": "tsc --noEmit",

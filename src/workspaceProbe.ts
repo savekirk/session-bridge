@@ -112,7 +112,7 @@ export async function probeEntireWorkspace(cwd: string | undefined): Promise<Ent
         workspaceState.activeSessions = await listActiveSessions(repoPath);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown error";
-        warnings.push(`Failed to load active sessions: ${message}`);
+        warnings.push(`Failed to load sessions: ${message}`);
       }
     }
 

@@ -4,19 +4,15 @@ import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
 import { getCurrentBranchName, getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';
 import { EntireStatusState, probeEntireWorkspace } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
-import { ActiveSessionTreeViewProvider, type ActiveSessionViewCommands } from './components/activeSessionTreeView';
-import { CheckpointTreeViewProvider, CheckpointViewCommands } from './components/checkpointTreeView';
-import {
-	launchCheckpointRewind,
-	openCheckpointDetailPanel,
-	openCheckpointRawTranscriptPanel,
-	type ExplainPanelTarget,
-	type RewindTarget,
-} from './components/checkpointDetailPanel';
+import { SessionsTreeViewProvider, type SessionsViewCommands } from './components/sessionsTreeView';
+import { CheckpointTreeViewProvider, getCheckpointSelectionContext, type CheckpointViewCommands } from './components/checkpointTreeView';
 import { runCommandAsync } from './runCommand';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
+const WORKSPACE_VIEW_ID = 'session.bridge.entire.workspace';
+const SESSIONS_VIEW_ID = 'session.bridge.entire.activeSessions';
+const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';
 const enum COMMAND_ID {
 	SHOW_STATUS = "session.bridge.entire.showStatus",
 	ENABLE = "session.bridge.entire.enable",
@@ -24,10 +20,7 @@ const enum COMMAND_ID {
 	REFRESH = "session.bridge.entire.refresh",
 	FETCH_CHECKPOINT_BRANCH = "session.bridge.entire.fetchCheckpointBranch",
 	BROWSE_CHECKPOINTS = "session.bridge.entire.browseCheckpoints",
-	EXPLAIN_CHECKPOINT = "session.bridge.entire.explainCheckpoint",
-	EXPLAIN_COMMIT = "session.bridge.entire.explainCommit",
-	OPEN_RAW_TRANSCRIPT = "session.bridge.entire.openRawTranscript",
-	REWIND_INTERACTIVE = "session.bridge.entire.rewindInteractive",
+	OPEN_COMMIT_CHANGES = "session.bridge.entire.openCommitChanges",
 	RESUME_BRANCH = "session.bridge.entire.resumeBranch",
 	RUN_DOCTOR = "session.bridge.entire.runDoctor",
 	CLEAN = "session.bridge.entire.clean",
@@ -35,19 +28,10 @@ const enum COMMAND_ID {
 	SHOW_TRACE = "session.bridge.entire.showTrace"
 }
 
-const VIEW_DEFINITIONS = [
-	{
-		id: 'session.bridge.entire.workspace',
-		label: 'Workspace',
-	},
-	{
-		id: 'session.bridge.entire.activeSessions',
-		label: 'Active Sessions',
-	},
-	{
-		id: 'session.bridge.entire.checkpoints',
-		label: 'Checkpoints',
-	},
+const TREE_VIEW_IDS = [
+	WORKSPACE_VIEW_ID,
+	SESSIONS_VIEW_ID,
+	CHECKPOINTS_VIEW_ID,
 ] as const;
 
 const COMMAND_TITLES: Record<COMMAND_ID, string> = {
@@ -57,10 +41,7 @@ const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.REFRESH]: 'Refresh',
 	[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',
 	[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',
-	[COMMAND_ID.EXPLAIN_CHECKPOINT]: 'Explain Checkpoint',
-	[COMMAND_ID.EXPLAIN_COMMIT]: 'Explain Commit',
-	[COMMAND_ID.OPEN_RAW_TRANSCRIPT]: 'Open Raw Transcript',
-	[COMMAND_ID.REWIND_INTERACTIVE]: 'Rewind To Checkpoint',
+	[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',
 	[COMMAND_ID.RESUME_BRANCH]: 'Resume Branch Session',
 	[COMMAND_ID.RUN_DOCTOR]: 'Run Doctor',
 	[COMMAND_ID.CLEAN]: 'Clean Entire State',
@@ -75,6 +56,24 @@ const WORKSPACE_CONTEXT: [EntireStatusState, string][] = [
 	[EntireStatusState.ENABLED, 'session.bridge.state.enabled'],
 	[EntireStatusState.NOT_GIT_REPO, 'session.bridge.state.not-git-repo']
 ];
+
+interface GitApi {
+	getRepository(uri: vscode.Uri): GitRepository | null;
+	openRepository(uri: vscode.Uri): Promise<GitRepository | null>;
+}
+
+interface GitRepository {
+	readonly rootUri: vscode.Uri;
+}
+
+interface GitExtension {
+	getAPI(version: 1): GitApi;
+}
+
+interface CommitChangesTarget {
+	commitSha?: string;
+	repoPath?: string;
+}
 
 const setWorkspaceContext = async (workspaceState: EntireStatusState) => {
 	for (const context of WORKSPACE_CONTEXT) {
@@ -99,10 +98,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	const checkpointCommands = {
 		refresh: COMMAND_ID.REFRESH,
-		explainCheckpoint: COMMAND_ID.EXPLAIN_CHECKPOINT,
-		explainCommit: COMMAND_ID.EXPLAIN_COMMIT,
-		rewindInteractive: COMMAND_ID.REWIND_INTERACTIVE,
-		openRawTranscript: COMMAND_ID.OPEN_RAW_TRANSCRIPT,
+		openCommitChanges: COMMAND_ID.OPEN_COMMIT_CHANGES,
 	} satisfies CheckpointViewCommands;
 
 	const checkpointProvider = new CheckpointTreeViewProvider(
@@ -111,16 +107,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		checkpointCommands,
 		outputChannel,
 	);
-	const activeSessionCommands = {
+	const sessionCommands = {
 		refresh: COMMAND_ID.REFRESH,
 		showStatus: COMMAND_ID.SHOW_STATUS,
-		explainCheckpoint: COMMAND_ID.EXPLAIN_CHECKPOINT,
 		runDoctor: COMMAND_ID.RUN_DOCTOR,
-	} satisfies ActiveSessionViewCommands;
-	const activeSessionProvider = new ActiveSessionTreeViewProvider(
+	} satisfies SessionsViewCommands;
+	const sessionsProvider = new SessionsTreeViewProvider(
 		workspaceState,
 		initialProbeTarget,
-		activeSessionCommands,
+		sessionCommands,
 		outputChannel,
 	);
 	const emptyTreeProvider: vscode.TreeDataProvider<vscode.TreeItem> = {
@@ -132,17 +127,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		},
 	};
 
-	for (const view of VIEW_DEFINITIONS) {
-		if (view.id === 'session.bridge.entire.activeSessions') {
-			context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, activeSessionProvider));
-			continue;
-		}
-		if (view.id === 'session.bridge.entire.checkpoints') {
-			context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, checkpointProvider));
-			continue;
-		}
-		context.subscriptions.push(vscode.window.registerTreeDataProvider(view.id, emptyTreeProvider));
-	}
+	context.subscriptions.push(vscode.window.registerTreeDataProvider(WORKSPACE_VIEW_ID, emptyTreeProvider));
+	context.subscriptions.push(vscode.window.registerTreeDataProvider(SESSIONS_VIEW_ID, sessionsProvider));
+	const checkpointTreeView = vscode.window.createTreeView(CHECKPOINTS_VIEW_ID, {
+		treeDataProvider: checkpointProvider,
+		showCollapseAll: true,
+	});
+	context.subscriptions.push(checkpointTreeView);
+	context.subscriptions.push(checkpointTreeView.onDidChangeSelection((event) => {
+		sessionsProvider.setCheckpointSelection(getCheckpointSelectionContext(event.selection[0]));
+	}));
 
 	const appendCommandRun = (commandId: COMMAND_ID) => {
 		outputChannel.appendLine(`[command] ${COMMAND_TITLES[commandId] ?? commandId}`);
@@ -247,8 +241,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		await setWorkspaceContext(workspaceState.state);
 		await updateProbeWatchers(cwd);
 		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
-		activeSessionProvider.setWorkspaceState(workspaceState, cwd);
-		activeSessionProvider.refresh();
+		sessionsProvider.setWorkspaceState(workspaceState, cwd);
+		sessionsProvider.refresh();
 		checkpointProvider.setWorkspaceState(workspaceState, cwd);
 		checkpointProvider.refresh();
 
@@ -294,9 +288,41 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 		outputChannel.appendLine(`[fetch] Fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
 		await refreshWorkspaceProbe(`fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
-		activeSessionProvider.reload();
+		sessionsProvider.reload();
 		checkpointProvider.reload();
 		await vscode.window.showInformationMessage(`Fetched ${METADATA_BRANCH_NAME} from ${remoteName}.`);
+	};
+
+	const openCommitChanges = async (target: CommitChangesTarget) => {
+		appendCommandRun(COMMAND_ID.OPEN_COMMIT_CHANGES);
+		if (!target.commitSha) {
+			await vscode.window.showWarningMessage("Checkpoint changes could not be opened.");
+			return;
+		}
+
+		const repoPath = target.repoPath ?? await resolveProbeTargetPath();
+		if (!repoPath) {
+			await vscode.window.showWarningMessage("Open a repository folder to inspect commit changes.");
+			return;
+		}
+
+		const gitApi = await getBuiltInGitApi();
+		if (!gitApi) {
+			await vscode.window.showWarningMessage("VS Code Git integration is not available.");
+			return;
+		}
+
+		let repository = gitApi.getRepository(vscode.Uri.file(repoPath));
+		if (!repository) {
+			repository = await gitApi.openRepository(vscode.Uri.file(repoPath));
+		}
+
+		if (!repository) {
+			await vscode.window.showWarningMessage("The repository is not available in VS Code Git.");
+			return;
+		}
+
+		await vscode.commands.executeCommand('git.viewCommit', repository, target.commitSha);
 	};
 
 	await updateProbeWatchers(await resolveProbeTargetPath());
@@ -333,8 +359,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					appendCommandRun(commandId);
 					outputChannel.appendLine(`[command] REFRESH: starting workspace probe`);
 					await refreshWorkspaceProbe('manual refresh');
-					outputChannel.appendLine(`[command] REFRESH: probe done, triggering active session reload`);
-					activeSessionProvider.reload();
+					outputChannel.appendLine(`[command] REFRESH: probe done, triggering sessions reload`);
+					sessionsProvider.reload();
 					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
 					checkpointProvider.reload();
 					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
@@ -346,57 +372,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					appendCommandRun(commandId);
 					outputChannel.appendLine(`[command] BROWSE_CHECKPOINTS: triggering checkpoint reload and focusing view`);
 					checkpointProvider.reload();
-					await vscode.commands.executeCommand('session.bridge.entire.checkpoints.focus');
+					await vscode.commands.executeCommand(`${CHECKPOINTS_VIEW_ID}.focus`);
 					return;
-				case COMMAND_ID.EXPLAIN_CHECKPOINT:
-				case COMMAND_ID.EXPLAIN_COMMIT: {
-					appendCommandRun(commandId);
-					const explainArg = normalizeExplainTarget(args[0]);
-					const hasValidTarget = commandId === COMMAND_ID.EXPLAIN_COMMIT
-						? typeof explainArg.commitSha === "string"
-						: typeof explainArg.checkpointId === "string";
-					if (!hasValidTarget) {
-						await vscode.window.showWarningMessage("Checkpoint detail could not be opened.");
-						return;
-					}
-					const repoPath = await resolveProbeTargetPath();
-					if (!repoPath) {
-						await vscode.window.showWarningMessage("Open a repository folder to inspect checkpoint details.");
-						return;
-					}
-					await openCheckpointDetailPanel(explainArg, { repoPath, outputChannel });
-					return;
-				}
-				case COMMAND_ID.OPEN_RAW_TRANSCRIPT: {
-					appendCommandRun(commandId);
-					const explainArg = normalizeExplainTarget(args[0]);
-					if (typeof explainArg.checkpointId !== "string") {
-						await vscode.window.showWarningMessage("Raw transcript could not be opened.");
-						return;
-					}
-					const repoPath = await resolveProbeTargetPath();
-					if (!repoPath) {
-						await vscode.window.showWarningMessage("Open a repository folder to inspect checkpoint details.");
-						return;
-					}
-					await openCheckpointRawTranscriptPanel(explainArg, { repoPath, outputChannel });
-					return;
-				}
-				case COMMAND_ID.REWIND_INTERACTIVE: {
-					appendCommandRun(commandId);
-					const rewindTarget = normalizeRewindTarget(args[0]);
-					if (typeof rewindTarget.checkpointId !== "string" && typeof rewindTarget.rewindPointId !== "string") {
-						await checkpointProvider.reload();
-						await vscode.commands.executeCommand('session.bridge.entire.checkpoints.focus');
-						await vscode.window.showInformationMessage('Select a checkpoint to continue the rewind flow.');
-						return;
-					}
-					const repoPath = await resolveProbeTargetPath();
-					if (!repoPath) {
-						await vscode.window.showWarningMessage("Open a repository folder to run rewind.");
-						return;
-					}
-					await launchCheckpointRewind(rewindTarget, { repoPath, outputChannel });
+				case COMMAND_ID.OPEN_COMMIT_CHANGES: {
+					const target = normalizeCommitChangesTarget(args[0]);
+					await openCommitChanges(target);
 					return;
 				}
 				case COMMAND_ID.SHOW_STATUS: {
@@ -412,7 +392,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	}
 
 	outputChannel.appendLine(`[activate] Registered Entire container: ${ENTIRE_CONTAINER_ID}`);
-	outputChannel.appendLine(`[activate] Registered views: ${VIEW_DEFINITIONS.map((view) => view.id).join(', ')}`);
+	outputChannel.appendLine(`[activate] Registered views: ${TREE_VIEW_IDS.join(', ')}`);
 }
 
 export function deactivate() { }
@@ -484,38 +464,30 @@ async function resolveDefaultRemoteName(repoPath: string): Promise<string | null
 	return remotes.includes("origin") ? "origin" : remotes[0];
 }
 
-function normalizeExplainTarget(value: unknown): ExplainPanelTarget {
+async function getBuiltInGitApi(): Promise<GitApi | null> {
+	const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
+	if (!gitExtension) {
+		return null;
+	}
+
+	const gitExports = gitExtension.isActive
+		? gitExtension.exports
+		: await gitExtension.activate();
+	return gitExports?.getAPI(1) ?? null;
+}
+
+function normalizeCommitChangesTarget(value: unknown): CommitChangesTarget {
 	if (!value || typeof value !== "object") {
 		return {};
 	}
 
 	const candidate = value as {
 		commitSha?: unknown;
-		checkpointId?: unknown;
-		sessionId?: unknown;
+		repoPath?: unknown;
 	};
 
 	return {
 		commitSha: typeof candidate.commitSha === "string" ? candidate.commitSha : undefined,
-		checkpointId: typeof candidate.checkpointId === "string" ? candidate.checkpointId : undefined,
-		sessionId: typeof candidate.sessionId === "string" ? candidate.sessionId : undefined,
-	};
-}
-
-function normalizeRewindTarget(value: unknown): RewindTarget {
-	if (!value || typeof value !== "object") {
-		return { isLogsOnly: false };
-	}
-
-	const candidate = value as {
-		checkpointId?: unknown;
-		rewindPointId?: unknown;
-		isLogsOnly?: unknown;
-	};
-
-	return {
-		checkpointId: typeof candidate.checkpointId === "string" ? candidate.checkpointId : undefined,
-		rewindPointId: typeof candidate.rewindPointId === "string" ? candidate.rewindPointId : undefined,
-		isLogsOnly: candidate.isLogsOnly === true,
+		repoPath: typeof candidate.repoPath === "string" ? candidate.repoPath : undefined,
 	};
 }

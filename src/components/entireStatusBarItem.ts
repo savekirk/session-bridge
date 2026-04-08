@@ -85,7 +85,7 @@ function buildTooltip(statusInfo: StatusBarInfo, workspaceState: EntireWorkspace
   }
 
   const sessionCount = workspaceState.activeSessions.length;
-  tooltip.appendMarkdown("\n\n**Active Sessions:** ");
+  tooltip.appendMarkdown("\n\n**Sessions:** ");
   tooltip.appendText(String(sessionCount));
 
   if (sessionCount > 0) {

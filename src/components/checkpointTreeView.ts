@@ -8,10 +8,12 @@ const CONTEXT_CHECKPOINT_DETAIL = "session-bridge-checkpoint-detail";
 
 export interface CheckpointViewCommands {
 	readonly refresh: string;
-	readonly explainCheckpoint: string;
-	readonly explainCommit: string;
-	readonly rewindInteractive: string;
-	readonly openRawTranscript: string;
+	readonly openCommitChanges: string;
+}
+
+export interface CheckpointSelectionContext {
+	checkpointIds: string[];
+	commitSha?: string;
 }
 
 export class ToplevelCheckpointTreeItem extends vscode.TreeItem {
@@ -45,25 +47,24 @@ export class CheckpointTreeItem extends vscode.TreeItem {
 		this.tooltip = buildCommitTooltip(card);
 		this.iconPath = new vscode.ThemeIcon('git-commit');
 		this.contextValue = CONTEXT_CHECKPOINT_COMMITTED;
-
-		this.command = {
-			command: commands.explainCommit,
-			title: "Explain Commit",
-			arguments: [{
-				commitSha: card.commit.sha,
-				checkpointId: selectRepresentativeCheckpoint(card)?.checkpointId,
-			}],
-		};
 	}
 }
 
 class CheckpointDetailItem extends vscode.TreeItem {
-	constructor(label: string, description: string, icon: string, tooltip?: string) {
+	constructor(
+		label: string,
+		description: string,
+		icon: string,
+		tooltip?: string,
+		command?: vscode.Command,
+		public readonly selectionContext?: CheckpointSelectionContext,
+	) {
 		super(label, vscode.TreeItemCollapsibleState.None);
 		this.description = description;
 		this.tooltip = tooltip ?? `${label}: ${description}`;
 		this.iconPath = new vscode.ThemeIcon(icon);
 		this.contextValue = CONTEXT_CHECKPOINT_DETAIL;
+		this.command = command;
 	}
 }
 
@@ -174,7 +175,7 @@ export class CheckpointTreeViewProvider implements vscode.TreeDataProvider<vscod
 		}
 
 		if (element instanceof CheckpointTreeItem) {
-			return buildChildItems(element.card);
+			return buildChildItems(element.card, this.commands, this.repoPath);
 		}
 
 		if (this.workspaceState.state !== EntireStatusState.ENABLED) {
@@ -251,6 +252,22 @@ export class CheckpointTreeViewProvider implements vscode.TreeDataProvider<vscod
 				this.changeEmitter.fire();
 			});
 	}
+}
+
+export function getCheckpointSelectionContext(element: vscode.TreeItem | undefined): CheckpointSelectionContext | undefined {
+	if (!element) {
+		return undefined;
+	}
+
+	if (element instanceof CheckpointTreeItem) {
+		return buildCheckpointSelectionContext(element.card);
+	}
+
+	if (element instanceof CheckpointDetailItem) {
+		return element.selectionContext;
+	}
+
+	return undefined;
 }
 
 function buildCheckpointLabel(card: CommitCheckpointGroup): string {
@@ -386,12 +403,19 @@ function hasChildren(card: CommitCheckpointGroup): boolean {
 function buildCommitCheckpointItems(committedCheckpoints: CommitCheckpointGroup[], commands: CheckpointViewCommands): vscode.TreeItem[] {
 	return committedCheckpoints.map((committed) => new CheckpointTreeItem(committed, commands));
 }
-function buildChildItems(card: CommitCheckpointGroup): vscode.TreeItem[] {
+function buildChildItems(
+	card: CommitCheckpointGroup,
+	commands: CheckpointViewCommands,
+	repoPath: string | undefined,
+): vscode.TreeItem[] {
+	const selectionContext = buildCheckpointSelectionContext(card);
 	return buildCommitDetailRows(card).map((detail) => new CheckpointDetailItem(
 		detail.label,
 		detail.description,
 		detail.icon,
 		detail.tooltip,
+		detail.command?.(commands, repoPath),
+		selectionContext,
 	));
 }
 
@@ -400,12 +424,14 @@ function buildCommitDetailRows(card: CommitCheckpointGroup): Array<{
 	description: string;
 	icon: string;
 	tooltip?: string;
+	command?: (commands: CheckpointViewCommands, repoPath: string | undefined) => vscode.Command | undefined;
 }> {
 	const rows: Array<{
 		label: string;
 		description: string;
 		icon: string;
 		tooltip?: string;
+		command?: (commands: CheckpointViewCommands, repoPath: string | undefined) => vscode.Command | undefined;
 	}> = [];
 	const checkpoint = selectRepresentativeCheckpoint(card);
 	const summary = checkpoint?.summary;
@@ -442,6 +468,13 @@ function buildCommitDetailRows(card: CommitCheckpointGroup): Array<{
 			label: "Changes",
 			description: changeParts.join(", "),
 			icon: "diff",
+			command: (commands, repoPath) => buildOpenCommitChangesCommand(card, commands, repoPath),
+		});
+		rows.push({
+			label: "View Diff",
+			description: "Open commit diff",
+			icon: "diff-multiple",
+			command: (commands, repoPath) => buildOpenCommitChangesCommand(card, commands, repoPath),
 		});
 	}
 
@@ -459,6 +492,32 @@ function buildCommitDetailRows(card: CommitCheckpointGroup): Array<{
 
 function selectRepresentativeCheckpoint(card: CommitCheckpointGroup): ResolvedCheckpointRef | undefined {
 	return card.checkpoints.find((entry) => entry.summary !== null) ?? card.checkpoints.at(0);
+}
+
+function buildCheckpointSelectionContext(card: CommitCheckpointGroup): CheckpointSelectionContext {
+	return {
+		checkpointIds: card.checkpoints.map((checkpoint) => checkpoint.checkpointId),
+		commitSha: card.commit.sha,
+	};
+}
+
+function buildOpenCommitChangesCommand(
+	card: CommitCheckpointGroup,
+	commands: CheckpointViewCommands,
+	repoPath: string | undefined,
+): vscode.Command | undefined {
+	if (!repoPath) {
+		return undefined;
+	}
+
+	return {
+		command: commands.openCommitChanges,
+		title: "Open Changes",
+		arguments: [{
+			commitSha: card.commit.sha,
+			repoPath,
+		}],
+	};
 }
 
 function buildRefreshAction(commands: CheckpointViewCommands): vscode.TreeItem {

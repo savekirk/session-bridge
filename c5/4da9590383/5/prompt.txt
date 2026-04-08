@@ -1,0 +1,1 @@
+Review all unstagged changes and group them into distinc commit based on sematic meaning and changes.

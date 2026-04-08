@@ -1,0 +1,1 @@
+Session details in src/components/sessionsTreeView.ts should include the attributions

@@ -1,0 +1,17 @@
+Refresh should always make sure the checkpoint repo is synced with remote
+
+---
+
+Loading indicator is not showing anymore. Fix it
+
+---
+
+Maintain the current row but show the native tree item loading bar
+
+---
+
+retry
+
+---
+
+For initial load without any loaded checkpoint, show the loading checkpoints text as it used to be

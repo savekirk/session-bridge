@@ -1,0 +1,35 @@
+Make sure session details [sessionDetailsPanel.ts](src/components/sessionDetailsPanel.ts) view is loaded when session is selected in the view tree
+
+---
+
+# Files mentioned by the user:
+
+## Screenshot 2026-04-10 at 13.58.20.png: /var/folders/20/76km_m352m390m49yn4j7yjm0000gq/T/TemporaryItems/NSIRD_screencaptureui_Gkv5xW/Screenshot 2026-04-10 at 13.58.20.png
+
+## My request for Codex:
+Use the attached image a inspiration to redesign the session details. Apart from user prompt and agent text message. Other information e.g tool call, thinking etc should be collapsible
+
+---
+
+Instead of writing "Agent" and "User", use the agent name and user's name. Also use iconography instead of user and agents name in circle to make the avatar
+
+---
+
+# Files mentioned by the user:
+
+## Screenshot 2026-04-10 at 14.36.42.png: /Users/savekirk/Documents/Screenshots/Screenshot 2026-04-10 at 14.36.42.png
+
+## My request for Codex:
+Fix session details header text format. Should take up the space to the right
+
+---
+
+Only the agent text message should have the agent avatar and agent name. For the rest, the user can tell it's an agent performing the action. So no need to show those details
+
+---
+
+Use the format "Tool: <tool name>" instead of using "TOOL EXECUTION" title
+
+---
+
+Session details should not have any initial agent bootstraping messages. The first item should be the first prompt from the user

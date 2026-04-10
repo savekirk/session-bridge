@@ -1,4 +1,10 @@
-import { collapseWhitespace, isJsonObject } from "./util";
+import {
+	countNativeTranscriptToolUses,
+	extractNativeTranscriptFirstTimestamp,
+	extractNativeTranscriptLatestTimestamp,
+	extractNativeTranscriptPrompt,
+	parseNativeTranscriptEvents,
+} from "./nativeTranscript";
 import type { TranscriptEvent } from "./types";
 
 const PRIMARY_TRANSCRIPT_FILE_NAME = "full.jsonl";
@@ -53,27 +59,7 @@ export async function loadStoredTranscript(reader: TranscriptStorageReader): Pro
  * @returns Parsed transcript events in source order.
  */
 export function parseTranscript(content: string): TranscriptEvent[] {
-	const trimmed = content.trim();
-	if (trimmed.length === 0) {
-		return [];
-	}
-
-	const nonEmptyLines = content
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.filter((line) => line.length > 0);
-
-	if (nonEmptyLines.length === 1) {
-		const parsedSingle = parseJsonMaybe(nonEmptyLines[0]);
-		if (parsedSingle !== undefined) {
-			return [toTranscriptEvent(0, parsedSingle, nonEmptyLines[0])];
-		}
-	}
-
-	return nonEmptyLines.map((line, index) => {
-		const parsed = parseJsonMaybe(line);
-		return toTranscriptEvent(index, parsed ?? line, line);
-	});
+	return parseNativeTranscriptEvents(content);
 }
 
 /**
@@ -83,19 +69,7 @@ export function parseTranscript(content: string): TranscriptEvent[] {
  * @returns The first extracted user prompt, or `undefined` when none can be inferred.
  */
 export function extractTranscriptPrompt(content: string | null): string | undefined {
-	if (!content) {
-		return undefined;
-	}
-
-	const events = parseTranscript(content);
-	for (const event of events) {
-		const extracted = extractPromptText(event.raw, event.eventType);
-		if (extracted) {
-			return collapseWhitespace(extracted);
-		}
-	}
-
-	return undefined;
+	return extractNativeTranscriptPrompt(content);
 }
 
 /**
@@ -105,17 +79,7 @@ export function extractTranscriptPrompt(content: string | null): string | undefi
  * @returns The inferred tool-use count, or `undefined` when no transcript is available.
  */
 export function countTranscriptToolUses(content: string | null): number | undefined {
-	if (!content) {
-		return undefined;
-	}
-
-	const events = parseTranscript(content);
-	if (events.length === 0) {
-		return undefined;
-	}
-
-	const total = events.reduce((sum, event) => sum + countPossibleToolUses(event.raw), 0);
-	return total > 0 ? total : undefined;
+	return countNativeTranscriptToolUses(content);
 }
 
 /**
@@ -126,23 +90,7 @@ export function countTranscriptToolUses(content: string | null): number | undefi
  * @returns The earliest timestamp string found near the start of the transcript.
  */
 export function extractTranscriptFirstTimestamp(content: string | null): string | undefined {
-	if (!content) {
-		return undefined;
-	}
-
-	for (const line of iterateTranscriptLinesFromStart(content)) {
-		const parsed = parseJsonMaybe(line);
-		if (!isJsonObject(parsed)) {
-			continue;
-		}
-
-		const timestamp = readFirstString(parsed, ["timestamp", "ts", "created_at"]);
-		if (timestamp) {
-			return timestamp;
-		}
-	}
-
-	return undefined;
+	return extractNativeTranscriptFirstTimestamp(content);
 }
 
 /**
@@ -153,79 +101,7 @@ export function extractTranscriptFirstTimestamp(content: string | null): string 
  * @returns The latest timestamp string found near the end of the transcript.
  */
 export function extractTranscriptLatestTimestamp(content: string | null): string | undefined {
-	if (!content) {
-		return undefined;
-	}
-
-	for (const line of iterateTranscriptLinesFromEnd(content)) {
-		const parsed = parseJsonMaybe(line);
-		if (!isJsonObject(parsed)) {
-			continue;
-		}
-
-		const timestamp = readFirstString(parsed, ["timestamp", "ts", "created_at"]);
-		if (timestamp) {
-			return timestamp;
-		}
-	}
-
-	return undefined;
-}
-
-function parseJsonMaybe(text: string): unknown {
-	try {
-		return JSON.parse(text) as unknown;
-	} catch {
-		return undefined;
-	}
-}
-
-function* iterateTranscriptLinesFromStart(content: string): Generator<string> {
-	let lineStart = 0;
-
-	for (let index = 0; index < content.length; index += 1) {
-		const char = content[index];
-		if (char !== "\n" && char !== "\r") {
-			continue;
-		}
-
-		const line = content.slice(lineStart, index).trim();
-		if (line.length > 0) {
-			yield line;
-		}
-
-		if (char === "\r" && content[index + 1] === "\n") {
-			index += 1;
-		}
-		lineStart = index + 1;
-	}
-
-	const lastLine = content.slice(lineStart).trim();
-	if (lastLine.length > 0) {
-		yield lastLine;
-	}
-}
-
-function* iterateTranscriptLinesFromEnd(content: string): Generator<string> {
-	let lineEnd = content.length;
-
-	for (let index = content.length - 1; index >= 0; index -= 1) {
-		const char = content[index];
-		if (char !== "\n" && char !== "\r") {
-			continue;
-		}
-
-		const line = content.slice(index + 1, lineEnd).trim();
-		if (line.length > 0) {
-			yield line;
-		}
-		lineEnd = index;
-	}
-
-	const firstLine = content.slice(0, lineEnd).trim();
-	if (firstLine.length > 0) {
-		yield firstLine;
-	}
+	return extractNativeTranscriptLatestTimestamp(content);
 }
 
 function sortTranscriptChunkNames(entryNames: string[]): string[] {
@@ -248,227 +124,4 @@ function getTranscriptChunkIndex(entryName: string): number | undefined {
 
 	const parsed = Number(match[1]);
 	return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function toTranscriptEvent(index: number, value: unknown, rawText: string): TranscriptEvent {
-	if (isJsonObject(value)) {
-		return {
-			index,
-			eventType: readFirstString(value, ["type", "event_type", "eventType", "kind"]),
-			timestamp: readFirstString(value, ["timestamp", "ts", "created_at"]),
-			raw: value,
-			rawText,
-		};
-	}
-
-	return {
-		index,
-		raw: value,
-		rawText,
-	};
-}
-
-function readFirstString(record: Record<string, unknown>, keys: string[]): string | undefined {
-	for (const key of keys) {
-		const value = record[key];
-		if (typeof value === "string") {
-			return value;
-		}
-	}
-
-	return undefined;
-}
-
-function extractPromptText(value: unknown, eventTypeHint?: string): string | undefined {
-	if (typeof value === "string" && isUserEventType(eventTypeHint)) {
-		return value;
-	}
-
-	if (Array.isArray(value)) {
-		for (const entry of value) {
-			const extracted = extractPromptText(entry, eventTypeHint);
-			if (extracted) {
-				return extracted;
-			}
-		}
-		return undefined;
-	}
-
-	if (!isJsonObject(value)) {
-		return undefined;
-	}
-
-	const recordType = normalizeString(readString(value, "type") ?? readString(value, "kind") ?? eventTypeHint);
-	const role = normalizeString(readString(value.info, "role") ?? readString(value, "role")) ?? recordType;
-
-	if (recordType === "queue-operation") {
-		const queuedPrompt = readFirstString(value, ["content", "message", "prompt", "text", "input"]);
-		if (queuedPrompt) {
-			return queuedPrompt;
-		}
-	}
-
-	if (role === "user") {
-		const direct = readFirstString(value, ["content", "message", "prompt", "text", "input"]);
-		if (direct) {
-			return direct;
-		}
-
-		for (const key of ["content", "parts", "items"]) {
-			const extracted = extractPromptTextParts(value[key], "user");
-			if (extracted) {
-				return extracted;
-			}
-		}
-	}
-
-	const direct = isUserEventType(eventTypeHint) ? readFirstString(value, ["content", "message", "prompt", "text", "input"]) : undefined;
-	if (direct) {
-		return direct;
-	}
-
-	if (value.message !== undefined) {
-		const extracted = extractPromptText(value.message, role ?? eventTypeHint);
-		if (extracted) {
-			return extracted;
-		}
-	}
-
-	for (const key of ["messages", "events", "items", "parts", "content", "data"]) {
-		const nested = value[key];
-		if (nested !== undefined) {
-			const extracted = extractPromptTextParts(nested, role ?? eventTypeHint);
-			if (extracted) {
-				return extracted;
-			}
-		}
-	}
-
-	for (const nested of Object.values(value)) {
-		const extracted = extractPromptText(nested, role ?? eventTypeHint);
-		if (extracted) {
-			return extracted;
-		}
-	}
-
-	return undefined;
-}
-
-function countPossibleToolUses(value: unknown): number {
-	if (Array.isArray(value)) {
-		return value.reduce((sum, entry) => sum + countPossibleToolUses(entry), 0);
-	}
-
-	if (!isJsonObject(value)) {
-		return 0;
-	}
-
-	let count = 0;
-	const typeValue = normalizeString(readString(value, "type") ?? readString(value, "kind"));
-	if (typeValue === "tool_result") {
-		return 0;
-	}
-
-	if (typeValue === "tool_use" || typeValue === "tool_call") {
-		count += 1;
-	}
-
-	if (Array.isArray(value.tool_calls)) {
-		count += value.tool_calls.filter((toolCall) => isToolCallRecord(toolCall)).length;
-	}
-
-	if (isToolCallRecord(value.tool_call)) {
-		count += 1;
-	}
-
-	if (count === 0 && isToolCallRecord(value)) {
-		count += 1;
-	}
-
-	for (const key of ["message", "content", "parts", "items", "messages", "events", "data"]) {
-		const nested = value[key];
-		if (nested !== undefined) {
-			count += countPossibleToolUses(nested);
-		}
-	}
-
-	return count;
-}
-
-function isUserEventType(value: string | undefined): boolean {
-	if (!value) {
-		return false;
-	}
-
-	return ["user", "human", "prompt", "input"].includes(value.toLowerCase());
-}
-
-function readString(value: unknown, key: string): string | undefined {
-	if (!isJsonObject(value)) {
-		return undefined;
-	}
-
-	const rawValue = value[key];
-	return typeof rawValue === "string" ? rawValue : undefined;
-}
-
-function extractPromptTextParts(value: unknown, eventTypeHint?: string): string | undefined {
-	if (Array.isArray(value)) {
-		for (const entry of value) {
-			if (typeof entry === "string" && isUserEventType(eventTypeHint)) {
-				return entry;
-			}
-
-			if (!isJsonObject(entry)) {
-				continue;
-			}
-
-			const entryType = normalizeString(readString(entry, "type") ?? readString(entry, "kind"));
-			if (entryType === "tool_result") {
-				continue;
-			}
-
-			if ((entryType === "text" || entryType === "input_text") && typeof entry.text === "string") {
-				return entry.text;
-			}
-
-			const extracted = extractPromptText(entry, eventTypeHint);
-			if (extracted) {
-				return extracted;
-			}
-		}
-
-		return undefined;
-	}
-
-	return extractPromptText(value, eventTypeHint);
-}
-
-function isToolCallRecord(value: unknown): boolean {
-	if (!isJsonObject(value)) {
-		return false;
-	}
-
-	const typeValue = normalizeString(readString(value, "type") ?? readString(value, "kind"));
-	if (typeValue === "tool_result") {
-		return false;
-	}
-
-	if (typeValue === "tool_use" || typeValue === "tool_call") {
-		return true;
-	}
-
-	if (typeof value.name === "string") {
-		return true;
-	}
-
-	if (isJsonObject(value.function) && typeof value.function.name === "string") {
-		return true;
-	}
-
-	return false;
-}
-
-function normalizeString(value: string | undefined): string | undefined {
-	return value?.toLowerCase();
 }

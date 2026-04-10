@@ -1,5 +1,11 @@
 import { NormalizedRewindPoint } from "./rewindIndex";
-import type { CheckpointSummaryRecord, InitialAttribution, SummaryRecord } from "./types";
+import type {
+	CheckpointSummaryRecord,
+	InitialAttribution,
+	SessionContentRecord,
+	SummaryRecord,
+	TokenUsage,
+} from "./types";
 
 /** Normalized live-or-historical session status used by card and detail models. */
 export type SessionStatus = "ACTIVE" | "IDLE" | "ENDED";
@@ -44,12 +50,21 @@ export interface RewindAvailability {
 }
 
 /** Normalized model for a session browser card. */
+export interface SessionCheckpointEntry {
+	checkpointId: string;
+	sessionIndex: number;
+	session: SessionContentRecord;
+	checkpointTokenUsage?: TokenUsage;
+}
+
+/** Normalized model for a session browser card. */
 export interface EntireSessionCard {
 	id: string;
 	sessionId: string;
 	promptPreview: string;
 	displayHash?: string;
 	checkpointIds: string[];
+	checkpointEntries?: SessionCheckpointEntry[];
 	agent?: string;
 	model?: string;
 	status: SessionStatus;
@@ -97,6 +112,67 @@ export interface EntireActiveSessionCard {
 	canOpenLastCheckpoint: boolean;
 	canOpenTranscript: boolean;
 	searchText: string;
+}
+
+export interface SessionDetailTarget {
+	sessionId: string;
+	promptPreview: string;
+	source: "live" | "checkpoint";
+	checkpointIds?: string[];
+	checkpointEntries?: SessionCheckpointEntry[];
+}
+
+export interface SessionTranscriptTarget extends SessionDetailTarget {
+	lastCheckpointId?: string;
+	transcriptPath?: string;
+}
+
+export interface SessionDetailToolActivity {
+	id: string;
+	kind: "tool_use";
+	label: string;
+	detail?: string;
+}
+
+export interface SessionDetailAuxiliaryBlock {
+	id: string;
+	kind: "thinking" | "tool_use" | "output";
+	label: string;
+	detail?: string;
+	tone?: "default" | "success" | "error";
+	display?: "text" | "code";
+}
+
+export interface SessionDetailTurn {
+	id: string;
+	actor: {
+		kind: "user" | "agent";
+		name?: string;
+		initials: string;
+		imageUri?: string;
+	};
+	timestamp?: string;
+	text?: string;
+	toolActivities: SessionDetailToolActivity[];
+	auxiliaryBlocks?: SessionDetailAuxiliaryBlock[];
+}
+
+export interface EntireSessionDetailModel {
+	sessionId: string;
+	source: "live" | "checkpoint";
+	promptPreview: string;
+	status: SessionStatus;
+	startedAt?: string;
+	lastActivityAt?: string;
+	durationMs?: number;
+	checkpointCount: number;
+	turnCount?: number;
+	toolCount?: number;
+	tokenCount?: number;
+	model?: string;
+	attribution?: InitialAttribution;
+	transcriptAvailable: boolean;
+	turns: SessionDetailTurn[];
 }
 
 /** Normalized model for a checkpoint browser card. */

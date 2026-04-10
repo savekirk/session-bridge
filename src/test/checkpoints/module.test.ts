@@ -10,6 +10,7 @@ import {
 	filterSessionCards,
 	getCommitDetail,
 	getCheckpointDetail,
+	getSessionDetail,
 	GitCheckpointStore,
 	getRawExplainOutput,
 	getRawTranscript,
@@ -219,6 +220,7 @@ suite("Checkpoint Module", () => {
 				assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "live-only"), false);
 				const selectedAlphaSession = selectedCheckpointSessions.find((card) => card.sessionId === "2026-03-30-alpha");
 				assert.strictEqual(selectedAlphaSession?.lastActivityAt, "2026-03-30T10:01:00Z");
+				assert.strictEqual(selectedAlphaSession?.checkpointEntries?.length, 1);
 				const betaSession = selectedCheckpointSessions.find((card) => card.sessionId === "2026-03-30-beta");
 				assert.strictEqual(betaSession?.lastActivityAt, "2026-03-30T11:02:00Z");
 
@@ -245,6 +247,36 @@ suite("Checkpoint Module", () => {
 				assert.strictEqual(activeSessions.some((card) => card.sessionId === "orphan-idle"), false);
 				assert.strictEqual(activeSessions.some((card) => card.sessionId === "unreachable-base"), false);
 				assert.strictEqual(activeSessions.some((card) => card.sessionId === "ended-session"), false);
+
+				const checkpointSessionDetail = await getSessionDetail(repoDir, {
+					sessionId: "2026-03-30-alpha",
+					promptPreview: "Build the parser",
+					source: "checkpoint",
+					checkpointIds: ["a3b2c4d5e6f7"],
+					checkpointEntries: selectedAlphaSession?.checkpointEntries,
+				});
+				assert.ok(checkpointSessionDetail);
+				assert.strictEqual(checkpointSessionDetail?.source, "checkpoint");
+				assert.strictEqual(checkpointSessionDetail?.status, "ACTIVE");
+				assert.strictEqual(checkpointSessionDetail?.transcriptAvailable, true);
+				assert.strictEqual(checkpointSessionDetail?.turns.length, 3);
+				assert.strictEqual(checkpointSessionDetail?.toolCount, 2);
+				assert.strictEqual(checkpointSessionDetail?.turns[0]?.actor.name, "Test User");
+				assert.strictEqual(checkpointSessionDetail?.turns[1]?.toolActivities.length, 2);
+				assert.strictEqual(checkpointSessionDetail?.turns[1]?.actor.name, "Claude Code");
+
+				const liveSessionDetail = await getSessionDetail(repoDir, {
+					sessionId: "2026-03-30-alpha",
+					promptPreview: "Build the parser",
+					source: "live",
+					checkpointIds: ["a3b2c4d5e6f7"],
+				});
+				assert.ok(liveSessionDetail);
+				assert.strictEqual(liveSessionDetail?.source, "live");
+				assert.strictEqual(liveSessionDetail?.status, "ACTIVE");
+				assert.strictEqual(liveSessionDetail?.transcriptAvailable, true);
+				assert.strictEqual(liveSessionDetail?.turns.length, 3);
+				assert.strictEqual(liveSessionDetail?.turns[0]?.actor.name, "Test User");
 
 				const detail = await getCheckpointDetail(repoDir, "a3b2c4d5e6f7");
 				assert.ok(detail);

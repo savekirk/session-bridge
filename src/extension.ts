@@ -5,8 +5,10 @@ import { getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } fro
 import { fetchDefaultCheckpointBranch } from './checkpointBranch';
 import { EntireStatusState, probeEntireWorkspace, resetAutomaticCheckpointFetchAttempt } from './workspaceProbe';
 import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';
-import { SessionsTreeViewProvider, type SessionsViewCommands } from './components/sessionsTreeView';
+import { SessionDetailsPanel } from './components/sessionDetailsPanel';
+import { SessionsTreeViewProvider, getSessionDetailTarget, type SessionsViewCommands } from './components/sessionsTreeView';
 import { CheckpointTreeViewProvider, getCheckpointSelectionContext, type CheckpointViewCommands } from './components/checkpointTreeView';
+import { getRawTranscript, getSessionDetail, type SessionTranscriptTarget } from './checkpoints';
 import { runCommandAsync } from './runCommand';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
@@ -21,6 +23,7 @@ const enum COMMAND_ID {
 	FETCH_CHECKPOINT_BRANCH = "session.bridge.entire.fetchCheckpointBranch",
 	BROWSE_CHECKPOINTS = "session.bridge.entire.browseCheckpoints",
 	OPEN_COMMIT_CHANGES = "session.bridge.entire.openCommitChanges",
+	OPEN_SESSION_TRANSCRIPT = "session.bridge.entire.openSessionTranscript",
 	RESUME_BRANCH = "session.bridge.entire.resumeBranch",
 	RUN_DOCTOR = "session.bridge.entire.runDoctor",
 	CLEAN = "session.bridge.entire.clean",
@@ -41,6 +44,7 @@ const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',
 	[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',
 	[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',
+	[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',
 	[COMMAND_ID.RESUME_BRANCH]: 'Resume Branch Session',
 	[COMMAND_ID.RUN_DOCTOR]: 'Run Doctor',
 	[COMMAND_ID.CLEAN]: 'Clean Entire State',
@@ -110,6 +114,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		refresh: COMMAND_ID.REFRESH,
 		showStatus: COMMAND_ID.SHOW_STATUS,
 		runDoctor: COMMAND_ID.RUN_DOCTOR,
+		openSessionTranscript: COMMAND_ID.OPEN_SESSION_TRANSCRIPT,
 	} satisfies SessionsViewCommands;
 	const sessionsProvider = new SessionsTreeViewProvider(
 		workspaceState,
@@ -117,8 +122,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		sessionCommands,
 		outputChannel,
 	);
+	const sessionDetailsPanel = new SessionDetailsPanel(outputChannel);
+	context.subscriptions.push(sessionDetailsPanel);
 
-	context.subscriptions.push(vscode.window.registerTreeDataProvider(SESSIONS_VIEW_ID, sessionsProvider));
+	const sessionsTreeView = vscode.window.createTreeView(SESSIONS_VIEW_ID, {
+		treeDataProvider: sessionsProvider,
+		showCollapseAll: true,
+	});
+	context.subscriptions.push(sessionsTreeView);
 	const checkpointTreeView = vscode.window.createTreeView(CHECKPOINTS_VIEW_ID, {
 		treeDataProvider: checkpointProvider,
 		showCollapseAll: true,
@@ -126,6 +137,48 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(checkpointTreeView);
 	context.subscriptions.push(checkpointTreeView.onDidChangeSelection((event) => {
 		sessionsProvider.setCheckpointSelection(getCheckpointSelectionContext(event.selection[0]));
+	}));
+
+	let sessionDetailLoadGeneration = 0;
+	const showSelectedSessionDetail = async (selection: vscode.TreeItem | undefined) => {
+		const target = getSessionDetailTarget(selection);
+		if (!target) {
+			return;
+		}
+
+		const repoPath = await resolveProbeTargetPath();
+		if (!repoPath) {
+			sessionDetailsPanel.showError("Open a repository folder to inspect session details.");
+			return;
+		}
+
+		const generation = ++sessionDetailLoadGeneration;
+		sessionDetailsPanel.showLoading(target);
+
+		try {
+			const detail = await getSessionDetail(repoPath, target);
+			if (generation !== sessionDetailLoadGeneration) {
+				return;
+			}
+
+			if (!detail) {
+				sessionDetailsPanel.showError("Session details are no longer available for the selected item.");
+				return;
+			}
+
+			sessionDetailsPanel.showDetail(detail);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Failed to load session details";
+			outputChannel.appendLine(`[session-details] load error: ${message}`);
+			if (generation !== sessionDetailLoadGeneration) {
+				return;
+			}
+
+			sessionDetailsPanel.showError(message);
+		}
+	};
+	context.subscriptions.push(sessionsTreeView.onDidChangeSelection((event) => {
+		void showSelectedSessionDetail(event.selection[0]);
 	}));
 
 	const appendCommandRun = (commandId: COMMAND_ID) => {
@@ -314,6 +367,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		await vscode.commands.executeCommand('git.viewCommit', repository, target.commitSha);
 	};
 
+	const openSessionTranscript = async (target: SessionTranscriptTarget | undefined) => {
+		appendCommandRun(COMMAND_ID.OPEN_SESSION_TRANSCRIPT);
+		if (!target) {
+			await vscode.window.showWarningMessage("Session transcript could not be opened.");
+			return;
+		}
+
+		if (target.transcriptPath) {
+			try {
+				await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(target.transcriptPath));
+				return;
+			} catch (error) {
+				const message = error instanceof Error ? error.message : String(error);
+				outputChannel.appendLine(`[session-transcript] failed to open ${target.transcriptPath}: ${message}`);
+			}
+		}
+
+		let transcript = selectTranscriptFromTarget(target);
+		if (!transcript) {
+			const repoPath = await resolveProbeTargetPath();
+			const checkpointId = target.lastCheckpointId ?? target.checkpointIds?.[0];
+			if (repoPath && checkpointId) {
+				transcript = await getRawTranscript(repoPath, checkpointId, target.sessionId);
+			}
+		}
+
+		if (!transcript) {
+			await vscode.window.showWarningMessage("No transcript is available for the selected session.");
+			return;
+		}
+
+		const document = await vscode.workspace.openTextDocument({
+			language: "plaintext",
+			content: transcript,
+		});
+		await vscode.window.showTextDocument(document, { preview: false });
+	};
+
 	await updateProbeWatchers(await resolveProbeTargetPath());
 	context.subscriptions.push({
 		dispose: () => {
@@ -366,6 +457,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				case COMMAND_ID.OPEN_COMMIT_CHANGES: {
 					const target = normalizeCommitChangesTarget(args[0]);
 					await openCommitChanges(target);
+					return;
+				}
+				case COMMAND_ID.OPEN_SESSION_TRANSCRIPT: {
+					const target = normalizeSessionTranscriptTarget(args[0]);
+					await openSessionTranscript(target);
 					return;
 				}
 				case COMMAND_ID.SHOW_STATUS: {
@@ -454,4 +550,54 @@ function normalizeCommitChangesTarget(value: unknown): CommitChangesTarget {
 		commitSha: typeof candidate.commitSha === "string" ? candidate.commitSha : undefined,
 		repoPath: typeof candidate.repoPath === "string" ? candidate.repoPath : undefined,
 	};
+}
+
+function normalizeSessionTranscriptTarget(value: unknown): SessionTranscriptTarget | undefined {
+	if (!value || typeof value !== "object") {
+		return undefined;
+	}
+
+	const candidate = value as SessionTranscriptTarget;
+	if (typeof candidate.sessionId !== "string") {
+		return undefined;
+	}
+	if (candidate.source !== "live" && candidate.source !== "checkpoint") {
+		return undefined;
+	}
+
+	return {
+		sessionId: candidate.sessionId,
+		promptPreview: typeof candidate.promptPreview === "string" ? candidate.promptPreview : "",
+		source: candidate.source,
+		checkpointIds: Array.isArray(candidate.checkpointIds)
+			? candidate.checkpointIds.filter((checkpointId): checkpointId is string => typeof checkpointId === "string")
+			: undefined,
+		checkpointEntries: Array.isArray(candidate.checkpointEntries) ? candidate.checkpointEntries : undefined,
+		lastCheckpointId: typeof candidate.lastCheckpointId === "string" ? candidate.lastCheckpointId : undefined,
+		transcriptPath: typeof candidate.transcriptPath === "string" ? candidate.transcriptPath : undefined,
+	};
+}
+
+function selectTranscriptFromTarget(target: SessionTranscriptTarget): string | null {
+	const entries = (target.checkpointEntries ?? [])
+		.filter((entry) => typeof entry.session.transcript === "string" && entry.session.transcript.length > 0);
+	if (entries.length === 0) {
+		return null;
+	}
+
+	const prioritized = [...entries].sort((left, right) => {
+		if (target.lastCheckpointId) {
+			const leftMatches = left.checkpointId === target.lastCheckpointId ? 1 : 0;
+			const rightMatches = right.checkpointId === target.lastCheckpointId ? 1 : 0;
+			if (leftMatches !== rightMatches) {
+				return rightMatches - leftMatches;
+			}
+		}
+
+		const leftTimestamp = Date.parse(left.session.metadata.createdAt ?? "");
+		const rightTimestamp = Date.parse(right.session.metadata.createdAt ?? "");
+		return (Number.isNaN(rightTimestamp) ? 0 : rightTimestamp) - (Number.isNaN(leftTimestamp) ? 0 : leftTimestamp);
+	});
+
+	return prioritized[0]?.session.transcript ?? null;
 }

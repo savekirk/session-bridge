@@ -5,6 +5,9 @@ import {
 	type EntireActiveSessionCard,
 	type EntireSessionCard,
 	type InitialAttribution,
+	type SessionCheckpointEntry,
+	type SessionDetailTarget,
+	type SessionTranscriptTarget,
 	type SessionStatus,
 } from "../checkpoints";
 import { EntireStatusState, type EntireWorkspaceState } from "../workspaceProbe";
@@ -18,6 +21,7 @@ export interface SessionsViewCommands {
 	readonly refresh: string;
 	readonly showStatus: string;
 	readonly runDoctor: string;
+	readonly openSessionTranscript: string;
 }
 
 export interface CheckpointSessionSelection {
@@ -43,6 +47,8 @@ type SessionTreeCard = {
 	turnCount?: number;
 	toolCount?: number;
 	tokenCount?: number;
+	checkpointIds?: string[];
+	checkpointEntries?: SessionCheckpointEntry[];
 	lastCheckpointId?: string;
 	transcriptPath?: string;
 	hasShadowBranch: boolean;
@@ -103,6 +109,20 @@ export class SessionsTreeItem extends vscode.TreeItem {
 		this.iconPath = new vscode.ThemeIcon(selectSessionIcon(card));
 		this.contextValue = CONTEXT_SESSION;
 	}
+}
+
+export function getSessionDetailTarget(element: vscode.TreeItem | undefined): SessionDetailTarget | undefined {
+	if (!(element instanceof SessionsTreeItem)) {
+		return undefined;
+	}
+
+	return {
+		sessionId: element.card.sessionId,
+		promptPreview: element.card.promptPreview,
+		source: element.card.kind,
+		checkpointIds: element.card.checkpointIds,
+		checkpointEntries: element.card.checkpointEntries,
+	};
 }
 
 export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -366,17 +386,8 @@ function buildSessionChildItems(card: SessionTreeCard, commands: SessionsViewCom
 		));
 	}
 
-	if (card.canOpenTranscript && card.transcriptPath) {
-		items.push(new SessionActionItem(
-			"Open Live Transcript",
-			"file",
-			{
-				command: "vscode.open",
-				title: "Open Live Transcript",
-				arguments: [vscode.Uri.file(card.transcriptPath)],
-			},
-			truncate(card.transcriptPath, 42),
-		));
+	if (card.canOpenTranscript) {
+		items.push(buildTranscriptAction(card, commands.openSessionTranscript));
 	}
 
 	if (card.canRunDoctor) {
@@ -391,6 +402,31 @@ function buildSessionChildItems(card: SessionTreeCard, commands: SessionsViewCom
 	}
 
 	return items;
+}
+
+function buildTranscriptAction(card: SessionTreeCard, commandId: string): SessionActionItem {
+	return new SessionActionItem(
+		"View Session Transcript",
+		"file",
+		{
+			command: commandId,
+			title: "View Session Transcript",
+			arguments: [buildSessionTranscriptTarget(card)],
+		},
+		card.transcriptPath ? truncate(card.transcriptPath, 42) : "Committed transcript",
+	);
+}
+
+function buildSessionTranscriptTarget(card: SessionTreeCard): SessionTranscriptTarget {
+	return {
+		sessionId: card.sessionId,
+		promptPreview: card.promptPreview,
+		source: card.kind,
+		checkpointIds: card.checkpointIds,
+		checkpointEntries: card.checkpointEntries,
+		lastCheckpointId: card.lastCheckpointId,
+		transcriptPath: card.transcriptPath,
+	};
 }
 
 function buildRefreshAction(commands: SessionsViewCommands): vscode.TreeItem {
@@ -747,6 +783,7 @@ function adaptLiveCard(card: EntireActiveSessionCard): SessionTreeCard {
 		checkpointCount: card.checkpointCount,
 		turnCount: card.turnCount,
 		tokenCount: card.tokenCount,
+		checkpointIds: card.lastCheckpointId ? [card.lastCheckpointId] : [],
 		lastCheckpointId: card.lastCheckpointId,
 		transcriptPath: card.transcriptPath,
 		hasShadowBranch: card.hasShadowBranch,
@@ -775,12 +812,14 @@ function adaptCheckpointSessionCard(card: EntireSessionCard): SessionTreeCard {
 		stepCount: card.stepCount,
 		toolCount: card.toolCount,
 		tokenCount: card.tokenCount,
+		checkpointIds: card.checkpointIds,
+		checkpointEntries: card.checkpointEntries,
 		lastCheckpointId: card.latestCheckpointId,
 		hasShadowBranch: false,
 		isStuck: false,
 		canRunDoctor: false,
 		canOpenLastCheckpoint: typeof card.latestCheckpointId === "string" && card.latestCheckpointId.length > 0,
-		canOpenTranscript: false,
+		canOpenTranscript: card.checkpointEntries?.some((entry) => typeof entry.session.transcript === "string" && entry.session.transcript.length > 0) ?? false,
 		searchText: card.searchText,
 	};
 }

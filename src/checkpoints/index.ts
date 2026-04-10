@@ -17,6 +17,15 @@ export {
 	countTranscriptToolUses,
 } from "./transcript";
 export {
+	parseNativeSessionTranscript,
+	detectNativeSessionTranscriptParser,
+	parseNativeTranscriptEvents,
+	extractNativeTranscriptPrompt,
+	extractNativeTranscriptFirstTimestamp,
+	extractNativeTranscriptLatestTimestamp,
+	countNativeTranscriptToolUses,
+} from "./nativeTranscript";
+export {
 	METADATA_BRANCH_NAME,
 	NO_DESCRIPTION,
 	collapseWhitespace,
@@ -53,6 +62,7 @@ export {
 	listCheckpointSummaries,
 	listSessionsForCheckpointIds,
 	listSessionCards,
+	getSessionDetail,
 	getCheckpointDetail,
 	getCommitDetail,
 	getRawExplainOutput,
@@ -78,16 +88,26 @@ export type {
 	TranscriptEvent,
 } from "./types";
 export type {
+	NativeTranscriptParserId,
+	ParseNativeSessionTranscriptOptions,
+	ParsedNativeTranscript,
+	ParsedNativeTranscriptMessage,
+} from "./nativeTranscript";
+export type {
 	AssociatedCommitModel,
 	CommitDetailModel,
 	CheckpointDetailModel,
 	CheckpointSummaryModel,
 	EntireActiveSessionCard,
+	EntireSessionDetailModel,
 	DiffSummaryModel,
 	EntireCheckpointCard,
 	EntireSessionCard,
 	FileDiffStat,
 	RewindAvailability,
+	SessionDetailTarget,
+	SessionCheckpointEntry,
+	SessionTranscriptTarget,
 	SessionStatus,
 	CheckpointCommit,
 	CommitCheckpointGroup,

@@ -14,9 +14,13 @@ import type {
 	CommitCheckpointGroup,
 	CommitDetailModel,
 	EntireCheckpointCard,
+	EntireSessionDetailModel,
 	EntireSessionCard,
 	RewindAvailability,
 	ResolvedCheckpointRef,
+	SessionCheckpointEntry,
+	SessionDetailTarget,
+	SessionDetailTurn,
 	SessionStatus,
 	CheckpointCommit,
 } from "./models";
@@ -28,6 +32,7 @@ import {
 	extractTranscriptPrompt,
 	countTranscriptToolUses,
 } from "./transcript";
+import { parseNativeSessionTranscript } from "./nativeTranscript";
 import {
 	buildGitEnrichmentIndex,
 	hydrateAssociatedCommits,
@@ -41,11 +46,13 @@ import {
 	collapseWhitespace,
 	compareOptionalTimestampsDesc,
 	formatCheckpointGroupDate,
+	isJsonObject,
 	parseTimestamp,
 	promptDescription,
 	sortUnique,
 	shortSha,
 	totalTokenUsage,
+	tryExecGit,
 } from "./util";
 import { sortCheckpointCards, sortSessionCards } from "./search";
 
@@ -320,6 +327,48 @@ export async function listSessionsForCheckpointIds(repoPath: string, checkpointI
 		.filter((checkpoint): checkpoint is LoadedCheckpointRecord => checkpoint !== null);
 
 	return sortSessionCards([...buildCommittedSessionCardMap(checkpoints, stateIndex).values()]);
+}
+
+/**
+ * Resolves a structured detail payload for a selected live or checkpoint-backed session.
+ *
+ * @param repoPath Repository root used to load session state and checkpoint metadata.
+ * @param target Selection target built from the Sessions tree item.
+ * @returns Structured session details, or `null` when the selection can no longer be resolved.
+ */
+export async function getSessionDetail(repoPath: string, target: SessionDetailTarget): Promise<EntireSessionDetailModel | null> {
+	const userDisplayName = await resolveUserDisplayName(repoPath);
+	if (target.source === "checkpoint" && (target.checkpointEntries?.length ?? 0) > 0) {
+		const stateIndex = await loadSessionStateIndex(repoPath);
+		return buildCheckpointSessionDetailModelFromEntries(target, target.checkpointEntries ?? [], stateIndex, userDisplayName);
+	}
+
+	const checkpointIds = sortUnique(
+		(target.checkpointIds ?? []).filter((checkpointId): checkpointId is string => typeof checkpointId === "string" && checkpointId.length > 0),
+	);
+	const detailContext = await loadDetailContext(repoPath, checkpointIds);
+	const liveState = detailContext.stateIndex.bySessionId.get(target.sessionId);
+
+	const resolvedCheckpointIds = checkpointIds.length > 0
+		? checkpointIds
+		: (liveState?.lastCheckpointId ? [liveState.lastCheckpointId] : []);
+	const checkpoints = (await Promise.all(resolvedCheckpointIds.map(async (checkpointId) => loadCheckpointRecord(
+		repoPath,
+		checkpointId,
+		detailContext,
+		false,
+	))))
+		.filter((checkpoint): checkpoint is LoadedCheckpointRecord => checkpoint !== null);
+
+	if (target.source === "live") {
+		if (!liveState) {
+			return null;
+		}
+
+		return buildLiveSessionDetailModel(liveState, checkpoints, target, userDisplayName);
+	}
+
+	return buildCheckpointSessionDetailModel(target, checkpoints, detailContext.stateIndex, userDisplayName);
 }
 
 /**
@@ -832,7 +881,7 @@ function buildCommittedSessionCardMap(
 
 	for (const checkpoint of checkpoints) {
 		const primaryCommit = checkpoint.commits[0];
-		for (const session of checkpoint.sessions) {
+		for (const [sessionIndex, session] of checkpoint.sessions.entries()) {
 			const sessionId = session.metadata.sessionId;
 			if (!sessionId) {
 				continue;
@@ -849,6 +898,12 @@ function buildCommittedSessionCardMap(
 			const toolCount = countTranscriptToolUses(session.transcript);
 			const createdAt = extractTranscriptFirstTimestamp(session.transcript) ?? session.metadata.createdAt;
 			const lastActivityAt = extractTranscriptLatestTimestamp(session.transcript) ?? session.metadata.createdAt ?? createdAt;
+			const checkpointEntry: SessionCheckpointEntry = {
+				checkpointId: checkpoint.checkpointId,
+				sessionIndex,
+				session,
+				checkpointTokenUsage: checkpoint.summary?.tokenUsage,
+			};
 
 			if (!existing) {
 				sessionMap.set(sessionId, {
@@ -857,6 +912,7 @@ function buildCommittedSessionCardMap(
 					promptPreview,
 					displayHash: checkpoint.checkpointId,
 					checkpointIds: [checkpoint.checkpointId],
+					checkpointEntries: [checkpointEntry],
 					agent: session.metadata.agent,
 					model: session.metadata.model,
 					status: getSessionStatus(sessionId, stateIndex),
@@ -887,6 +943,9 @@ function buildCommittedSessionCardMap(
 			if (!existing.checkpointIds.includes(checkpoint.checkpointId)) {
 				existing.checkpointIds.push(checkpoint.checkpointId);
 				existing.checkpointCount = existing.checkpointIds.length;
+			}
+			if (!existing.checkpointEntries?.some((entry) => entry.checkpointId === checkpoint.checkpointId && entry.sessionIndex === sessionIndex)) {
+				existing.checkpointEntries = [...(existing.checkpointEntries ?? []), checkpointEntry];
 			}
 
 			if (isLater(lastActivityAt, existing.lastActivityAt)) {
@@ -984,6 +1043,127 @@ function buildActiveSessionCard(
 	};
 }
 
+async function buildLiveSessionDetailModel(
+	liveState: LoadedLiveSession,
+	checkpoints: LoadedCheckpointRecord[],
+	target: SessionDetailTarget,
+	userDisplayName: string | undefined,
+): Promise<EntireSessionDetailModel> {
+	const checkpoint = checkpoints.find((entry) => entry.checkpointId === liveState.lastCheckpointId)
+		?? checkpoints[0];
+	const checkpointSession = selectSessionContentForLiveSession(liveState, checkpoint);
+	const liveTranscript = await readTextIfExists(liveState.transcriptPath);
+	const transcript = liveTranscript ?? checkpointSession?.transcript ?? null;
+	const parsedTranscript = transcript
+		? parseNativeSessionTranscript(transcript, {
+			agentHint: liveState.agentType ?? checkpointSession?.metadata.agent,
+			sessionIdHint: liveState.sessionId,
+			userHint: userDisplayName,
+		})
+		: null;
+	const turns = parsedTranscript?.turns ?? [];
+	const promptPreview = collapseWhitespace(liveState.lastPrompt ?? "").length > 0
+		? collapseWhitespace(liveState.lastPrompt ?? "")
+		: collapseWhitespace(parsedTranscript?.promptPreview ?? "").length > 0
+			? collapseWhitespace(parsedTranscript?.promptPreview ?? "")
+			: selectPromptPreview(
+				checkpointSession?.prompts ?? null,
+				transcript,
+				target.promptPreview,
+			);
+
+	return {
+		sessionId: liveState.sessionId,
+		source: "live",
+		promptPreview,
+		status: normalizeSessionStatus(liveState.phase, liveState.endedAt),
+		startedAt: liveState.startedAt ?? parsedTranscript?.startedAt ?? checkpointSession?.metadata.createdAt,
+		lastActivityAt: liveState.lastInteractionAt ?? parsedTranscript?.endedAt ?? checkpointSession?.metadata.createdAt,
+		durationMs: liveState.sessionDurationMs ?? checkpointSession?.metadata.sessionMetrics?.durationMs,
+		checkpointCount: liveState.checkpointCount ?? checkpointSession?.metadata.checkpointsCount ?? (liveState.lastCheckpointId ? 1 : 0),
+		turnCount: liveState.sessionTurnCount ?? checkpointSession?.metadata.sessionMetrics?.turnCount ?? turns.length,
+		toolCount: parsedTranscript?.toolCount ?? countTranscriptToolUses(transcript),
+		tokenCount: totalTokenUsage(liveState.tokenUsage)
+			?? totalTokenUsage(checkpointSession?.metadata.tokenUsage)
+			?? totalTokenUsage(checkpoint?.summary?.tokenUsage),
+		model: liveState.modelName ?? parsedTranscript?.model ?? checkpointSession?.metadata.model,
+		attribution: checkpointSession?.metadata.initialAttribution,
+		transcriptAvailable: typeof transcript === "string" && transcript.length > 0,
+		turns,
+	};
+}
+
+function buildCheckpointSessionDetailModel(
+	target: SessionDetailTarget,
+	checkpoints: LoadedCheckpointRecord[],
+	stateIndex: SessionStateIndex,
+	userDisplayName: string | undefined,
+): EntireSessionDetailModel | null {
+	const sessionEntries = checkpoints.flatMap((checkpoint) => checkpoint.sessions
+		.filter((session) => session.metadata.sessionId === target.sessionId)
+		.map((session) => ({
+			checkpointId: checkpoint.checkpointId,
+			session,
+			checkpointTokenUsage: checkpoint.summary?.tokenUsage,
+		})));
+	return buildCheckpointSessionDetailModelFromEntries(target, sessionEntries, stateIndex, userDisplayName);
+}
+
+function buildCheckpointSessionDetailModelFromEntries(
+	target: SessionDetailTarget,
+	sessionEntries: ReadonlyArray<Pick<SessionCheckpointEntry, "checkpointId" | "session" | "checkpointTokenUsage">>,
+	stateIndex: SessionStateIndex,
+	userDisplayName: string | undefined,
+): EntireSessionDetailModel | null {
+	if (sessionEntries.length === 0) {
+		return null;
+	}
+
+	const sortedEntries = [...sessionEntries].sort((left, right) => (
+		(parseTimestamp(extractTranscriptLatestTimestamp(right.session.transcript) ?? right.session.metadata.createdAt) ?? 0)
+		- (parseTimestamp(extractTranscriptLatestTimestamp(left.session.transcript) ?? left.session.metadata.createdAt) ?? 0)
+	));
+	const [latestEntry] = sortedEntries;
+	const transcriptEntry = sortedEntries.find((entry) => typeof entry.session.transcript === "string" && entry.session.transcript.length > 0)
+		?? latestEntry;
+	const transcript = transcriptEntry.session.transcript;
+	const parsedTranscript = transcript
+		? parseNativeSessionTranscript(transcript, {
+			agentHint: latestEntry.session.metadata.agent,
+			sessionIdHint: target.sessionId,
+			userHint: userDisplayName,
+		})
+		: null;
+	const turns = parsedTranscript?.turns ?? [];
+	const checkpointCount = new Set(sessionEntries.map((entry) => entry.checkpointId)).size;
+	const sessions = sessionEntries.map((entry) => entry.session);
+
+	return {
+		sessionId: target.sessionId,
+		source: "checkpoint",
+		promptPreview: collapseWhitespace(parsedTranscript?.promptPreview ?? "").length > 0
+			? collapseWhitespace(parsedTranscript?.promptPreview ?? "")
+			: selectPromptPreview(
+				latestEntry.session.prompts,
+				transcript,
+				target.promptPreview,
+			),
+		status: getSessionStatus(target.sessionId, stateIndex),
+		startedAt: parsedTranscript?.startedAt ?? pickEarliestSessionTimestamp(sessionEntries),
+		lastActivityAt: parsedTranscript?.endedAt ?? pickLatestSessionTimestamp(sessionEntries),
+		durationMs: latestEntry.session.metadata.sessionMetrics?.durationMs,
+		checkpointCount,
+		turnCount: latestEntry.session.metadata.sessionMetrics?.turnCount ?? turns.length,
+		toolCount: parsedTranscript?.toolCount ?? countTranscriptToolUses(transcript),
+		tokenCount: totalTokenUsage(latestEntry.session.metadata.tokenUsage)
+			?? totalTokenUsage(latestEntry.checkpointTokenUsage),
+		model: parsedTranscript?.model ?? latestEntry.session.metadata.model,
+		attribution: selectLatestMetadataWithValue(sessions, (session) => session.metadata.initialAttribution),
+		transcriptAvailable: typeof transcript === "string" && transcript.length > 0,
+		turns,
+	};
+}
+
 function selectSessionIds(checkpoint: LoadedCheckpointRecord | undefined): string[] {
 	if (!checkpoint) {
 		return [];
@@ -1004,6 +1184,49 @@ function selectSessionContentForLiveSession(
 
 	return checkpoint.sessions.find((session) => session.metadata.sessionId === liveState.sessionId)
 		?? selectLatestSession(checkpoint.sessions);
+}
+
+async function readTextIfExists(filePath: string | undefined): Promise<string | null> {
+	if (!filePath) {
+		return null;
+	}
+
+	try {
+		return await fs.readFile(filePath, "utf8");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+			return null;
+		}
+		throw error;
+	}
+}
+
+async function resolveUserDisplayName(repoPath: string): Promise<string | undefined> {
+	const configuredName = (await tryExecGit(repoPath, ["config", "user.name"]))?.trim();
+	if (configuredName) {
+		return configuredName;
+	}
+
+	return undefined;
+}
+
+function humanizeUserIdentifier(value: string | undefined): string | undefined {
+	if (!value) {
+		return undefined;
+	}
+
+	const normalized = value
+		.replace(/[._-]+/g, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (normalized.length === 0) {
+		return undefined;
+	}
+
+	return normalized
+		.split(" ")
+		.map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+		.join(" ");
 }
 
 async function canReadFile(filePath: string | undefined): Promise<boolean> {
@@ -1163,6 +1386,49 @@ function selectRepresentativeCheckpointDetail(
 	checkpoints: CheckpointDetailModel[],
 ): CheckpointDetailModel | undefined {
 	return [...checkpoints].sort((left, right) => (parseTimestamp(right.time) ?? 0) - (parseTimestamp(left.time) ?? 0))[0];
+}
+
+function pickEarliestSessionTimestamp(
+	sessionEntries: ReadonlyArray<{ session: SessionContentRecord }>,
+): string | undefined {
+	let earliest: string | undefined;
+
+	for (const entry of sessionEntries) {
+		const candidate = extractTranscriptFirstTimestamp(entry.session.transcript) ?? entry.session.metadata.createdAt;
+		if (!candidate) {
+			continue;
+		}
+
+		if (!earliest || (parseTimestamp(candidate) ?? 0) < (parseTimestamp(earliest) ?? 0)) {
+			earliest = candidate;
+		}
+	}
+
+	return earliest;
+}
+
+function pickLatestSessionTimestamp(
+	sessionEntries: ReadonlyArray<{ session: SessionContentRecord }>,
+): string | undefined {
+	let latest: string | undefined;
+
+	for (const entry of sessionEntries) {
+		const candidate = extractTranscriptLatestTimestamp(entry.session.transcript) ?? entry.session.metadata.createdAt;
+		if (!candidate) {
+			continue;
+		}
+
+		if (!latest || (parseTimestamp(candidate) ?? 0) > (parseTimestamp(latest) ?? 0)) {
+			latest = candidate;
+		}
+	}
+
+	return latest;
+}
+
+function countToolsFromTurns(turns: SessionDetailTurn[]): number | undefined {
+	const total = turns.reduce((sum, turn) => sum + turn.toolActivities.length, 0);
+	return total > 0 ? total : undefined;
 }
 
 async function loadSessionsWithRecovery(

@@ -579,7 +579,7 @@ function renderDetailState(detail: EntireSessionDetailModel): string {
 		renderMetaCard("Started", formatSummaryTimestamp(detail.startedAt)),
 		renderMetaCard("Last Active", formatSummaryTimestamp(detail.lastActivityAt)),
 		renderMetaCard("Duration", formatDuration(detail.durationMs)),
-		renderMetaCard("Model", detail.model),
+		renderMetaCard("Agent", `${detail.agent} (${detail.model})`.trim() || undefined),
 		renderMetaCard("Stats", statsParts.join(" · ")),
 		renderMetaCard("Attribution", formatAttribution(detail)),
 	].filter((card): card is string => typeof card === "string");

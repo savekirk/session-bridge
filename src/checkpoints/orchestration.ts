@@ -1087,6 +1087,7 @@ async function buildLiveSessionDetailModel(
 			?? totalTokenUsage(checkpointSession?.metadata.tokenUsage)
 			?? totalTokenUsage(checkpoint?.summary?.tokenUsage),
 		model: liveState.modelName ?? parsedTranscript?.model ?? checkpointSession?.metadata.model,
+		agent: liveState.agentType ?? checkpointSession?.metadata.agent,
 		attribution: checkpointSession?.metadata.initialAttribution,
 		transcriptAvailable: typeof transcript === "string" && transcript.length > 0,
 		turns,

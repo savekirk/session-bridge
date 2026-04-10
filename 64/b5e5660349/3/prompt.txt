@@ -1,0 +1,9 @@
+Error loading session conversation details with message `No readable transcript turns were found.` for a repo that has one in /Users/savekirk/dev/swapinga/swapinga-platform
+
+---
+
+Selecting a checkpoint is not loading or replacing the existing sessions with the ones in the selected checkpoint within the view tree
+
+---
+
+Only the sessions first selected checkpoint within a date group is loading and the rest never loads, just shows the native loading indicator but nothing happens. Sessions only change when you select from a differrent date group. This does not happen all the time. Sometimes the old session info persist and a new one is appended which is not related to it

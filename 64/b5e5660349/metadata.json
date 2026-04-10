@@ -1,0 +1,34 @@
+{
+  "cli_version": "0.5.3",
+  "checkpoint_id": "64b5e5660349",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 6,
+  "files_touched": [
+    "src/checkpoints/index.ts",
+    "src/checkpoints/models.ts",
+    "src/checkpoints/orchestration.ts",
+    "src/checkpoints/transcript.ts",
+    "src/components/sessionDetailsPanel.ts",
+    "src/components/sessionsTreeView.ts",
+    "src/extension.ts",
+    "src/test/checkpoints/module.test.ts",
+    "src/test/components/sessionDetailsPanel.test.ts",
+    "src/test/components/sessionsUi.test.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/64/b5e5660349/0/metadata.json",
+      "transcript": "/64/b5e5660349/0/full.jsonl",
+      "content_hash": "/64/b5e5660349/0/content_hash.txt",
+      "prompt": "/64/b5e5660349/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 12180476,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 10614400,
+    "output_tokens": 111769,
+    "api_call_count": 98
+  }
+}

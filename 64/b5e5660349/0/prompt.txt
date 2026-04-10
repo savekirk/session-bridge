@@ -1,0 +1,46 @@
+Build a session details webview. Should be shown when the user selects a sections. The view should have the following, the details of the session and a scrollable turn by turn conversation between the author and ai, parsed, formatted and displayed in a human readable manner
+
+---
+
+Show a ui sketch of the design
+
+---
+
+"You" should be replaced with the avatar of the user and AI should be the name of the agent with logo. If not available use the initials within the avatar
+
+---
+
+Do not add the full names
+
+---
+
+Do not add the full name of the agent as well
+
+---
+
+Go ahead with the implementation
+
+---
+
+Implement the plan.
+
+---
+
+Do not render any content that is not a text response or tool call by the agent. Details should not have raw transcript content
+
+---
+
+- Use only time and not full date unless session duration is more than a day, even that use only day and time and not full date
+- Tool calls should not have the leading agent avatar
+
+---
+
+[Image #1] Messate/text should be aligned in the middle of the avatar and time
+
+---
+
+Should be aligned with just the avatar in the middle
+
+---
+
+Group tool calls, any tool call before a response from the model should go below the model. Tool calls should not directly follow user type message.

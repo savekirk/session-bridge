@@ -1,0 +1,9 @@
+All tool use design in [sessionDetailsPanel.ts](src/components/sessionDetailsPanel.ts) should have same design and remove the trailing timestamp
+
+---
+
+They should have borders around them. Make them look distint and use the tool icon instead of full word
+
+---
+
+In the session details header file, use the full dates (day, month name and year) for started and last active

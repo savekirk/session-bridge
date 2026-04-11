@@ -1,13 +1,1 @@
-Update `listSessions` in [orchestration.ts](src/checkpoints/orchestration.ts) to use sessionPaths to fetch sessions if it's not empty and revert to using the checkpoint id if empty. Wire this into [sessionsTreeView.ts](src/components/sessionsTreeView.ts) [extension.ts](src/extension.ts) [checkpointTreeView.ts](src/components/checkpointTreeView.ts) to make sure whenever a section is selected the necessary model is populated and the sessions for the selected checkpoint is loaded. We want to avoid reloading and processing data that has been done already when checkpoints are loaded when we want to load sessions for the selected checkpoint. Update the documentations and necessary tests after the change.
-
----
-
-`CheckpointSessionSelection` in [sessionsTreeView.ts](src/components/sessionsTreeView.ts) and `CheckpointSelectionContext` in [checkpointTreeView.ts](src/components/checkpointTreeView.ts) perform same function. Get rid of one
-
----
-
-[sessionsTreeView.ts](src/components/sessionsTreeView.ts) should not use activeSessions from [workspaceProbe.ts](src/workspaceProbe.ts) . Should be keeping it's own state of sessions for selected checkpoint. When clicked,  the  details in [sessionDetailsPanel.ts](src/components/sessionDetailsPanel.ts) should always load the session details for the selected section with no fallback to any other session
-
----
-
-[sessionsTreeView.ts](src/components/sessionsTreeView.ts) should have nothing to do with active sessions. We'll handle active session in a different view tree later. For now remove all active session functionalities and anything related
+Commit the changes

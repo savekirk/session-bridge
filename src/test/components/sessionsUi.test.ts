@@ -33,6 +33,7 @@ suite("Sessions UI", () => {
 			}),
 			"/repo",
 			commands,
+			"active",
 		);
 
 		const items = provider.getChildren();
@@ -42,26 +43,29 @@ suite("Sessions UI", () => {
 		assert.strictEqual(getLabel(items[1]), "Cursor (model-x) · Review the parser edge cases");
 	});
 
-	test("provider shows an empty state when there are no live sessions and no checkpoint selection", () => {
+	test("checkpoint provider prompts for a checkpoint selection before loading sessions", () => {
 		const provider = new SessionsTreeViewProvider(
 			createWorkspaceState(),
 			"/repo",
 			commands,
+			"checkpoint",
 		);
 
 		const items = provider.getChildren();
 		assert.strictEqual(items.length, 2);
-		assert.strictEqual(getLabel(items[0]), "No sessions to show");
+		assert.strictEqual(getLabel(items[0]), "Select a checkpoint to view sessions");
 		assert.strictEqual(items[1].command?.command, commands.refresh);
 	});
 
-	test("provider loads selected checkpoint sessions when there are no live sessions", async () => {
+	test("checkpoint provider loads selected checkpoint sessions even when live sessions exist", async () => {
 		const provider = new SessionsTreeViewProvider(
-			createWorkspaceState(),
+			createWorkspaceState({
+				activeSessions: [createLiveCard({ sessionId: "live-session", agent: "OpenCode" })],
+			}),
 			"/repo",
 			commands,
+			"checkpoint",
 			undefined,
-			async () => [],
 			async (_repoPath, checkpointIds) => {
 				assert.deepStrictEqual(checkpointIds, ["a3b2c4d5e6f7"]);
 				return [
@@ -108,8 +112,8 @@ suite("Sessions UI", () => {
 			createWorkspaceState(),
 			"/repo",
 			commands,
+			"checkpoint",
 			undefined,
-			async () => [],
 			async () => {
 				throw new Error("boom");
 			},
@@ -153,6 +157,7 @@ suite("Sessions UI", () => {
 			}),
 			"/repo",
 			commands,
+			"active",
 		);
 
 		const [sessionItem] = provider.getChildren();
@@ -169,11 +174,19 @@ suite("Sessions UI", () => {
 		const startedRow = children.find((child) => getLabel(child) === "Started");
 		assert.ok(startedRow);
 		assert.strictEqual(startedRow?.description, formatShortTimestamp("2026-04-04T09:00:00Z"));
+		const lastActiveRow = children.find((child) => getLabel(child) === "Last Active");
+		assert.ok(lastActiveRow);
+		assert.strictEqual(lastActiveRow?.description, formatShortTimestamp("2026-04-04T10:00:00Z"));
+		const worktreeRow = children.find((child) => getLabel(child) === "Worktree");
+		assert.ok(worktreeRow);
+		assert.strictEqual(worktreeRow?.description, "/repo");
+		const checkpointRow = children.find((child) => getLabel(child) === "Latest Checkpoint");
+		assert.ok(checkpointRow);
+		assert.strictEqual(checkpointRow?.description, "a3b2c4d5e6f7");
 		const attributionRow = children.find((child) => getLabel(child) === "Attribution");
 		assert.ok(attributionRow);
 		assert.strictEqual(attributionRow?.description, "93.3% agent · 42/45 lines");
 		assert.strictEqual(attributionRow?.tooltip, "Agent authored: 42/45 committed lines (93.3%)\nHuman added: 3\nHuman modified: 1\nHuman removed: 0\nCalculated: 2026-04-04T10:01:00Z");
-		assert.strictEqual(children.some((child) => getLabel(child) === "Last Active"), false);
 		const transcriptAction = children.find((child) => getLabel(child) === "View Session Transcript");
 		assert.ok(transcriptAction);
 		assert.strictEqual(transcriptAction?.command?.command, commands.openSessionTranscript);
@@ -197,8 +210,8 @@ suite("Sessions UI", () => {
 			createWorkspaceState(),
 			"/repo",
 			commands,
+			"checkpoint",
 			undefined,
-			async () => [],
 			async () => [
 				createCheckpointSessionCard({
 					sessionId: "checkpoint-session-with-transcript",
@@ -268,6 +281,7 @@ suite("Sessions UI", () => {
 			}),
 			"/repo",
 			commands,
+			"active",
 		);
 
 		const [sessionItem] = provider.getChildren();
@@ -282,8 +296,8 @@ suite("Sessions UI", () => {
 			createWorkspaceState(),
 			"/repo",
 			commands,
+			"checkpoint",
 			undefined,
-			async () => [],
 			async () => [
 				createCheckpointSessionCard({
 					sessionId: "checkpoint-session-with-attribution",
@@ -312,27 +326,20 @@ suite("Sessions UI", () => {
 		assert.strictEqual(attributionRow?.description, "100% agent · 18/18 lines");
 	});
 
-	test("provider prefers live sessions over checkpoint selection", () => {
-		let checkpointLoadCalls = 0;
+	test("active provider ignores checkpoint selection and keeps the live-session snapshot", () => {
 		const provider = new SessionsTreeViewProvider(
 			createWorkspaceState({
 				activeSessions: [createLiveCard({ sessionId: "live-session", agent: "OpenCode" })],
 			}),
 			"/repo",
 			commands,
-			undefined,
-			async () => [],
-			async () => {
-				checkpointLoadCalls += 1;
-				return [];
-			},
+			"active",
 		);
 
 		provider.setCheckpointSelection({ checkpointIds: ["a3b2c4d5e6f7"] });
 		const items = provider.getChildren();
 		assert.strictEqual(items.length, 1);
 		assert.strictEqual(getLabel(items[0]), "OpenCode (model-x) · Investigate failing test");
-		assert.strictEqual(checkpointLoadCalls, 0);
 	});
 
 	test("provider adopts passive workspace probe session updates without reload", () => {
@@ -340,11 +347,10 @@ suite("Sessions UI", () => {
 			createWorkspaceState(),
 			"/repo",
 			commands,
-			undefined,
-			async () => [],
+			"active",
 		);
 
-		assert.strictEqual(getLabel(provider.getChildren()[0]), "No sessions to show");
+		assert.strictEqual(getLabel(provider.getChildren()[0]), "No active sessions");
 
 		provider.setWorkspaceState(
 			createWorkspaceState({
@@ -363,8 +369,8 @@ suite("Sessions UI", () => {
 			createWorkspaceState(),
 			"/repo",
 			commands,
+			"checkpoint",
 			undefined,
-			async () => [],
 			async () => [
 				createCheckpointSessionCard({
 					sessionId: "checkpoint-session",
@@ -419,6 +425,7 @@ suite("Sessions UI", () => {
 			}),
 			"/repo",
 			commands,
+			"active",
 		);
 		const [liveItem] = liveProvider.getChildren();
 		assert.deepStrictEqual(getSessionDetailTarget(liveItem), {

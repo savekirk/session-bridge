@@ -11,7 +11,7 @@ suite('Extension Test Suite', () => {
 		const manifestPath = path.resolve(__dirname, '../../package.json');
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
 			contributes?: {
-				views?: Record<string, Array<{ id: string }>>;
+				views?: Record<string, Array<{ id: string; name?: string; when?: string }>>;
 				viewsWelcome?: Array<{ view: string; contents: string }>;
 				commands?: Array<{ command: string }>;
 			};
@@ -22,6 +22,16 @@ suite('Extension Test Suite', () => {
 			contributedViews.some((view) => view.id === 'session.bridge.entire.recovery'),
 			false,
 		);
+		const activeSessionsView = contributedViews.find((view) => view.id === 'session.bridge.entire.activeSessions');
+		assert.ok(activeSessionsView);
+		assert.strictEqual(activeSessionsView?.name, 'Active Sessions');
+		assert.strictEqual(
+			activeSessionsView?.when,
+			'session.bridge.state.enabled && session.bridge.state.has-active-sessions',
+		);
+		const checkpointSessionsView = contributedViews.find((view) => view.id === 'session.bridge.entire.sessions');
+		assert.ok(checkpointSessionsView);
+		assert.strictEqual(checkpointSessionsView?.name, 'Checkpoint Sessions');
 
 		const welcomeViews = manifest.contributes?.viewsWelcome ?? [];
 		assert.strictEqual(

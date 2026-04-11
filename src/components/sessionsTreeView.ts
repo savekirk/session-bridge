@@ -1,9 +1,8 @@
 import * as vscode from "vscode";
 import {
-	listActiveSessions,
 	listSessionsForCheckpointIds,
-	type EntireActiveSessionCard,
 	type EntireSessionCard,
+	type EntireActiveSessionCard,
 	type InitialAttribution,
 	type SessionCheckpointEntry,
 	type SessionDetailTarget,
@@ -29,6 +28,8 @@ export interface CheckpointSessionSelection {
 	commitSha?: string;
 }
 
+export type SessionsTreeMode = "active" | "checkpoint";
+
 type SessionTreeCard = {
 	kind: "live" | "checkpoint";
 	sessionId: string;
@@ -51,6 +52,9 @@ type SessionTreeCard = {
 	checkpointEntries?: SessionCheckpointEntry[];
 	lastCheckpointId?: string;
 	transcriptPath?: string;
+	worktreePath?: string;
+	worktreeId?: string;
+	baseCommit?: string;
 	hasShadowBranch: boolean;
 	isStuck: boolean;
 	canRunDoctor: boolean;
@@ -139,21 +143,25 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 		workspaceState: EntireWorkspaceState,
 		repoPath: string | undefined,
 		private readonly commands: SessionsViewCommands,
+		private readonly mode: SessionsTreeMode,
 		private readonly outputChannel?: vscode.OutputChannel,
-		private readonly loadLiveSessions: (repoPath: string) => Promise<EntireActiveSessionCard[]> = listActiveSessions,
 		private readonly loadCheckpointSessions: (repoPath: string, checkpointIds: string[]) => Promise<EntireSessionCard[]> = listSessionsForCheckpointIds,
 	) {
 		this.workspaceState = workspaceState;
 		this.repoPath = repoPath;
-		this.loadState = buildInitialLoadState(workspaceState);
+		this.loadState = buildInitialLoadState(mode, workspaceState);
 		this.debug(`constructor: state=${workspaceState.state}, repoPath=${repoPath ?? "(none)"}`);
 	}
 
 	private debug(message: string): void {
-		this.outputChannel?.appendLine(`[sessions] ${message}`);
+		this.outputChannel?.appendLine(`[sessions:${this.mode}] ${message}`);
 	}
 
 	setCheckpointSelection(selection: CheckpointSessionSelection | undefined): void {
+		if (this.mode !== "checkpoint") {
+			return;
+		}
+
 		const normalizedSelection = normalizeCheckpointSelection(selection);
 		if (sameCheckpointSelection(this.selectedCheckpointSelection, normalizedSelection)) {
 			return;
@@ -162,13 +170,13 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 		this.selectedCheckpointSelection = normalizedSelection;
 		this.debug(`setCheckpointSelection: checkpointIds=${normalizedSelection?.checkpointIds.join(",") ?? "(none)"}`);
 
-		if (this.workspaceState.state !== EntireStatusState.ENABLED || this.workspaceState.activeSessions.length > 0) {
+		if (this.workspaceState.state !== EntireStatusState.ENABLED) {
 			this.changeEmitter.fire();
 			return;
 		}
 
 		this.loadGeneration++;
-		this.loadState = { kind: "ready" };
+		this.loadState = buildInitialLoadState(this.mode, this.workspaceState);
 		this.changeEmitter.fire();
 	}
 
@@ -184,16 +192,9 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 		this.repoPath = repoPath;
 		this.debug(`setWorkspaceState: state=${workspaceState.state}, repoPath=${repoPath ?? "(none)"}, repoChanged=${repoChanged}, enabledChanged=${enabledChanged}, sessionSnapshotChanged=${sessionSnapshotChanged}, loadState=${this.loadState.kind}`);
 
-		if (repoChanged || enabledChanged) {
+		if (repoChanged || enabledChanged || (this.mode === "active" && sessionSnapshotChanged)) {
 			this.loadGeneration++;
-			this.loadState = buildInitialLoadState(workspaceState);
-		} else if (workspaceState.state === EntireStatusState.ENABLED && sessionSnapshotChanged) {
-			if (workspaceState.activeSessions.length > 0) {
-				// Keep the tree aligned with passive workspace probes without forcing another live-state read.
-				this.loadState = { kind: "loaded", cards: sortCards(workspaceState.activeSessions.map(adaptLiveCard)) };
-			} else {
-				this.loadState = { kind: "ready" };
-			}
+			this.loadState = buildInitialLoadState(this.mode, workspaceState);
 		}
 
 		this.changeEmitter.fire();
@@ -207,10 +208,16 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 	reload(): void {
 		this.loadGeneration++;
 		const generation = this.loadGeneration;
-		this.loadState = { kind: "ready" };
+		this.loadState = buildInitialLoadState(this.mode, this.workspaceState);
 
 		if (this.workspaceState.state !== EntireStatusState.ENABLED || !this.repoPath) {
 			this.debug(`reload: skipped (state=${this.workspaceState.state}, repoPath=${this.repoPath ?? "(none)"}), gen=${generation}`);
+			this.changeEmitter.fire();
+			return;
+		}
+
+		if (this.mode === "active") {
+			this.debug(`reload: using workspace probe snapshot, gen=${generation}`);
 			this.changeEmitter.fire();
 			return;
 		}
@@ -237,12 +244,23 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 			return [];
 		}
 
-		if (!shouldShowLiveSessions(this.workspaceState) && !hasCheckpointSelection(this.selectedCheckpointSelection)) {
+		if (this.mode === "active" && !hasLiveSessions(this.workspaceState)) {
 			return [
 				new EmptyStateItem(
-					"No sessions to show",
-					"play-circle",
-					"Live sessions appear here automatically. When none are running, select a checkpoint to inspect the sessions captured in it.",
+					"No active sessions",
+					"pulse",
+					"This view appears only while Entire reports live sessions for the current repository.",
+				),
+				buildRefreshAction(this.commands),
+			];
+		}
+
+		if (this.mode === "checkpoint" && !hasCheckpointSelection(this.selectedCheckpointSelection)) {
+			return [
+				new EmptyStateItem(
+					"Select a checkpoint to view sessions",
+					"history",
+					"Choose a checkpoint in the Checkpoints tree to load only the sessions captured in that checkpoint.",
 				),
 				buildRefreshAction(this.commands),
 			];
@@ -266,7 +284,7 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 
 			case "loaded":
 				if (this.loadState.cards.length === 0) {
-					if (hasCheckpointSelection(this.selectedCheckpointSelection)) {
+					if (this.mode === "checkpoint" && hasCheckpointSelection(this.selectedCheckpointSelection)) {
 						return [
 							new EmptyStateItem(
 								"No sessions in selected checkpoint",
@@ -279,9 +297,9 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 
 					return [
 						new EmptyStateItem(
-							"No sessions to show",
-							"play-circle",
-							"Live sessions appear here automatically. When none are running, select a checkpoint to inspect the sessions captured in it.",
+							"No active sessions",
+							"pulse",
+							"This view appears only while Entire reports live sessions for the current repository.",
 						),
 						buildRefreshAction(this.commands),
 					];
@@ -292,15 +310,17 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 	}
 
 	private startBackgroundLoad(repoPath: string): void {
+		if (this.mode !== "checkpoint") {
+			return;
+		}
+
 		const generation = this.loadGeneration;
 		this.loadState = { kind: "loading" };
 		const startTime = Date.now();
-		const mode = shouldShowLiveSessions(this.workspaceState) ? "live" : "checkpoint";
-		this.debug(`startBackgroundLoad: gen=${generation}, mode=${mode}, timeout=${LOAD_TIMEOUT_MS}ms`);
+		this.debug(`startBackgroundLoad: gen=${generation}, mode=checkpoint, timeout=${LOAD_TIMEOUT_MS}ms`);
 
-		const work = shouldShowLiveSessions(this.workspaceState)
-			? this.loadLiveSessions(repoPath).then((cards) => cards.map(adaptLiveCard))
-			: this.loadCheckpointSessions(repoPath, this.selectedCheckpointSelection?.checkpointIds ?? []).then((cards) => cards.map(adaptCheckpointSessionCard));
+		const work = this.loadCheckpointSessions(repoPath, this.selectedCheckpointSelection?.checkpointIds ?? [])
+			.then((cards) => cards.map(adaptCheckpointSessionCard));
 		const timeout = new Promise<never>((_resolve, reject) => {
 			setTimeout(() => reject(new Error("Session load timed out")), LOAD_TIMEOUT_MS);
 		});
@@ -355,6 +375,33 @@ function buildSessionChildItems(card: SessionTreeCard, commands: SessionsViewCom
 			formatShortTimestamp(card.startedAt),
 			"history",
 			card.startedAt,
+		));
+	}
+
+	if (card.kind === "live" && card.lastActivityAt && card.lastActivityAt !== card.startedAt) {
+		items.push(new SessionDetailItem(
+			"Last Active",
+			formatShortTimestamp(card.lastActivityAt),
+			"pulse",
+			card.lastActivityAt,
+		));
+	}
+
+	if (card.kind === "live" && card.worktreePath) {
+		items.push(new SessionDetailItem(
+			"Worktree",
+			truncate(card.worktreePath, 48),
+			"folder-library",
+			card.worktreePath,
+		));
+	}
+
+	if (card.kind === "live" && card.lastCheckpointId) {
+		items.push(new SessionDetailItem(
+			"Latest Checkpoint",
+			card.lastCheckpointId,
+			"history",
+			card.lastCheckpointId,
 		));
 	}
 
@@ -464,6 +511,18 @@ function buildSessionTooltip(card: SessionTreeCard): vscode.MarkdownString {
 
 	if (card.model) {
 		tooltip.appendMarkdown(`**Model:** ${escapeMarkdown(card.model)}\n\n`);
+	}
+
+	if (card.kind === "live" && card.lastActivityAt && card.lastActivityAt !== card.startedAt) {
+		tooltip.appendMarkdown(`**Last Active:** ${escapeMarkdown(card.lastActivityAt)}\n\n`);
+	}
+
+	if (card.kind === "live" && card.worktreePath) {
+		tooltip.appendMarkdown(`**Worktree:** ${escapeMarkdown(card.worktreePath)}\n\n`);
+	}
+
+	if (card.lastCheckpointId) {
+		tooltip.appendMarkdown(`**Latest Checkpoint:** ${escapeMarkdown(card.lastCheckpointId)}\n\n`);
 	}
 
 	const duration = buildDurationDetail(card);
@@ -717,13 +776,15 @@ function sameSessionSnapshot(left: EntireActiveSessionCard[], right: EntireActiv
 	return true;
 }
 
-function buildInitialLoadState(workspaceState: EntireWorkspaceState): LoadState {
-	return shouldShowLiveSessions(workspaceState)
-		? { kind: "loaded", cards: sortCards(workspaceState.activeSessions.map(adaptLiveCard)) }
-		: { kind: "ready" };
+function buildInitialLoadState(mode: SessionsTreeMode, workspaceState: EntireWorkspaceState): LoadState {
+	if (mode === "active") {
+		return { kind: "loaded", cards: sortCards(workspaceState.activeSessions.map(adaptLiveCard)) };
+	}
+
+	return { kind: "ready" };
 }
 
-function shouldShowLiveSessions(workspaceState: EntireWorkspaceState): boolean {
+function hasLiveSessions(workspaceState: EntireWorkspaceState): boolean {
 	return workspaceState.state === EntireStatusState.ENABLED && workspaceState.activeSessions.length > 0;
 }
 
@@ -786,6 +847,9 @@ function adaptLiveCard(card: EntireActiveSessionCard): SessionTreeCard {
 		checkpointIds: card.lastCheckpointId ? [card.lastCheckpointId] : [],
 		lastCheckpointId: card.lastCheckpointId,
 		transcriptPath: card.transcriptPath,
+		worktreePath: card.worktreePath,
+		worktreeId: card.worktreeId,
+		baseCommit: card.baseCommit,
 		hasShadowBranch: card.hasShadowBranch,
 		isStuck: card.isStuck,
 		canRunDoctor: card.canRunDoctor,

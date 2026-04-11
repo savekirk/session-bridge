@@ -579,7 +579,7 @@ function renderDetailState(detail: EntireSessionDetailModel): string {
 		renderMetaCard("Started", formatSummaryTimestamp(detail.startedAt)),
 		renderMetaCard("Last Active", formatSummaryTimestamp(detail.lastActivityAt)),
 		renderMetaCard("Duration", formatDuration(detail.durationMs)),
-		renderMetaCard("Agent", `${detail.agent} (${detail.model})`.trim() || undefined),
+		renderMetaCard("Agent", formatAgentSummary(detail)),
 		renderMetaCard("Stats", statsParts.join(" · ")),
 		renderMetaCard("Attribution", formatAttribution(detail)),
 	].filter((card): card is string => typeof card === "string");
@@ -772,7 +772,7 @@ function getAuxiliaryBlocks(
 }
 
 function formatActorLabel(actor: EntireSessionDetailModel["turns"][number]["actor"]): string {
-	return actor.name ?? (actor.kind === "user" ? "User" : "Agent");
+	return sanitizeDisplayLabel(actor.name) ?? (actor.kind === "user" ? "User" : "Agent");
 }
 
 function renderActorIcon(kind: "user" | "agent"): string {
@@ -799,6 +799,27 @@ function formatAuxiliaryKindLabel(kind: "thinking" | "tool_use" | "output"): str
 		default:
 			return "Tool Execution";
 	}
+}
+
+function formatAgentSummary(detail: EntireSessionDetailModel): string | undefined {
+	const agentName = sanitizeDisplayLabel(detail.agent)
+		?? detail.turns.find((turn) => turn.actor.kind === "agent")?.actor.name;
+	const normalizedAgentName = sanitizeDisplayLabel(agentName);
+	const normalizedModel = sanitizeDisplayLabel(detail.model);
+
+	if (!normalizedAgentName && !normalizedModel) {
+		return undefined;
+	}
+
+	if (!normalizedAgentName) {
+		return normalizedModel;
+	}
+
+	if (!normalizedModel || normalizedModel.toLowerCase() === normalizedAgentName.toLowerCase()) {
+		return normalizedAgentName;
+	}
+
+	return `${normalizedAgentName} (${normalizedModel})`;
 }
 
 function formatDetailTimestamp(timestamp: string | undefined, includeDayInTimestamp: boolean): string | undefined {
@@ -907,4 +928,21 @@ function escapeHtml(value: string): string {
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;")
 		.replace(/'/g, "&#39;");
+}
+
+function sanitizeDisplayLabel(value: string | undefined): string | undefined {
+	if (!value) {
+		return undefined;
+	}
+
+	const normalized = value.trim();
+	if (normalized.length === 0) {
+		return undefined;
+	}
+
+	if (normalized.toLowerCase() === "undefined" || normalized.toLowerCase() === "null") {
+		return undefined;
+	}
+
+	return normalized;
 }

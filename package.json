@@ -31,9 +31,15 @@
           "icon": "media/dark/history.svg"
         },
         {
+          "id": "session.bridge.entire.activeSessions",
+          "name": "Active Sessions",
+          "icon": "media/dark/play.svg",
+          "when": "session.bridge.state.enabled && session.bridge.state.has-active-sessions"
+        },
+        {
           "id": "session.bridge.entire.sessions",
-          "name": "Sessions",
-          "icon": "media/dark/play.svg"
+          "name": "Checkpoint Sessions",
+          "icon": "media/dark/history.svg"
         }
       ]
     },
@@ -61,22 +67,22 @@
       {
         "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.not-git-repo",
-        "contents": "Open a Git repository to see sessions."
+        "contents": "Open a Git repository to see checkpoint sessions."
       },
       {
         "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.cli-missing",
-        "contents": "Sessions will appear here after Entire is installed and enabled."
+        "contents": "Checkpoint sessions will appear here after Entire is installed and enabled."
       },
       {
         "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.disabled",
-        "contents": "Sessions will appear here after Entire is enabled."
+        "contents": "Checkpoint sessions will appear here after Entire is enabled."
       },
       {
         "view": "session.bridge.entire.sessions",
         "when": "session.bridge.state.enabled",
-        "contents": "Live sessions appear here automatically. When none are running, select a checkpoint to inspect its sessions.\n[Refresh session state](command:session.bridge.entire.refresh)"
+        "contents": "Select a checkpoint to inspect only the sessions captured in that checkpoint.\n[Refresh session state](command:session.bridge.entire.refresh)"
       },
       {
         "view": "session.bridge.entire.checkpoints",

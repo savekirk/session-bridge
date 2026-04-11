@@ -14,7 +14,9 @@ import { runCommandAsync } from './runCommand';
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
 const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';
+const ACTIVE_SESSIONS_VIEW_ID = 'session.bridge.entire.activeSessions';
 const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';
+const HAS_ACTIVE_SESSIONS_CONTEXT = 'session.bridge.state.has-active-sessions';
 const enum COMMAND_ID {
 	SHOW_STATUS = "session.bridge.entire.showStatus",
 	ENABLE = "session.bridge.entire.enable",
@@ -33,6 +35,7 @@ const enum COMMAND_ID {
 
 const TREE_VIEW_IDS = [
 	SESSIONS_VIEW_ID,
+	ACTIVE_SESSIONS_VIEW_ID,
 	CHECKPOINTS_VIEW_ID,
 ] as const;
 
@@ -78,12 +81,17 @@ interface CommitChangesTarget {
 	repoPath?: string;
 }
 
-const setWorkspaceContext = async (workspaceState: EntireStatusState) => {
+const setWorkspaceContext = async (
+	workspaceState: EntireStatusState,
+	hasActiveSessions: boolean,
+) => {
 	for (const context of WORKSPACE_CONTEXT) {
 		const status = context[0] === workspaceState;
 		const key = context[1];
 		await vscode.commands.executeCommand('setContext', key, status);
 	}
+
+	await vscode.commands.executeCommand('setContext', HAS_ACTIVE_SESSIONS_CONTEXT, hasActiveSessions);
 };
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -92,7 +100,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	const initialProbeTarget = await resolveProbeTargetPath();
 	let workspaceState = await probeEntireWorkspace(initialProbeTarget);
-	await setWorkspaceContext(workspaceState.state);
+	await setWorkspaceContext(workspaceState.state, workspaceState.activeSessions.length > 0);
 	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
 	if (vscode.workspace.workspaceFolders?.length) {
 		statusBarItem.show();
@@ -116,27 +124,40 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		runDoctor: COMMAND_ID.RUN_DOCTOR,
 		openSessionTranscript: COMMAND_ID.OPEN_SESSION_TRANSCRIPT,
 	} satisfies SessionsViewCommands;
-	const sessionsProvider = new SessionsTreeViewProvider(
+	const checkpointSessionsProvider = new SessionsTreeViewProvider(
 		workspaceState,
 		initialProbeTarget,
 		sessionCommands,
+		'checkpoint',
+		outputChannel,
+	);
+	const activeSessionsProvider = new SessionsTreeViewProvider(
+		workspaceState,
+		initialProbeTarget,
+		sessionCommands,
+		'active',
 		outputChannel,
 	);
 	const sessionDetailsPanel = new SessionDetailsPanel(outputChannel);
 	context.subscriptions.push(sessionDetailsPanel);
 
-	const sessionsTreeView = vscode.window.createTreeView(SESSIONS_VIEW_ID, {
-		treeDataProvider: sessionsProvider,
+	const checkpointSessionsTreeView = vscode.window.createTreeView(SESSIONS_VIEW_ID, {
+		treeDataProvider: checkpointSessionsProvider,
 		showCollapseAll: true,
 	});
-	context.subscriptions.push(sessionsTreeView);
+	context.subscriptions.push(checkpointSessionsTreeView);
+	const activeSessionsTreeView = vscode.window.createTreeView(ACTIVE_SESSIONS_VIEW_ID, {
+		treeDataProvider: activeSessionsProvider,
+		showCollapseAll: true,
+	});
+	context.subscriptions.push(activeSessionsTreeView);
 	const checkpointTreeView = vscode.window.createTreeView(CHECKPOINTS_VIEW_ID, {
 		treeDataProvider: checkpointProvider,
 		showCollapseAll: true,
 	});
 	context.subscriptions.push(checkpointTreeView);
 	context.subscriptions.push(checkpointTreeView.onDidChangeSelection((event) => {
-		sessionsProvider.setCheckpointSelection(getCheckpointSelectionContext(event.selection[0]));
+		checkpointSessionsProvider.setCheckpointSelection(getCheckpointSelectionContext(event.selection[0]));
 	}));
 
 	let sessionDetailLoadGeneration = 0;
@@ -177,7 +198,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			sessionDetailsPanel.showError(message);
 		}
 	};
-	context.subscriptions.push(sessionsTreeView.onDidChangeSelection((event) => {
+	context.subscriptions.push(checkpointSessionsTreeView.onDidChangeSelection((event) => {
+		void showSelectedSessionDetail(event.selection[0]);
+	}));
+	context.subscriptions.push(activeSessionsTreeView.onDidChangeSelection((event) => {
 		void showSelectedSessionDetail(event.selection[0]);
 	}));
 
@@ -284,11 +308,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			resetAutomaticCheckpointFetchAttempt(cwd);
 		}
 		workspaceState = await probeEntireWorkspace(cwd);
-		await setWorkspaceContext(workspaceState.state);
+		await setWorkspaceContext(workspaceState.state, workspaceState.activeSessions.length > 0);
 		await updateProbeWatchers(cwd);
 		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
-		sessionsProvider.setWorkspaceState(workspaceState, cwd);
-		sessionsProvider.refresh();
+		checkpointSessionsProvider.setWorkspaceState(workspaceState, cwd);
+		checkpointSessionsProvider.refresh();
+		activeSessionsProvider.setWorkspaceState(workspaceState, cwd);
+		activeSessionsProvider.refresh();
 		checkpointProvider.setWorkspaceState(workspaceState, cwd);
 		checkpointProvider.refresh();
 
@@ -330,7 +356,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 		outputChannel.appendLine(`[fetch] Fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
 		await refreshWorkspaceProbe(`fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
-		sessionsProvider.reload();
+		checkpointSessionsProvider.reload();
+		activeSessionsProvider.reload();
 		checkpointProvider.reload();
 		await vscode.window.showInformationMessage(`Fetched ${METADATA_BRANCH_NAME} from ${remoteName}.`);
 	};
@@ -439,8 +466,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					appendCommandRun(commandId);
 					outputChannel.appendLine(`[command] REFRESH: starting workspace probe`);
 					await refreshWorkspaceProbe('manual refresh');
-					outputChannel.appendLine(`[command] REFRESH: probe done, triggering sessions reload`);
-					sessionsProvider.reload();
+					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint sessions reload`);
+					checkpointSessionsProvider.reload();
+					outputChannel.appendLine(`[command] REFRESH: probe done, triggering active sessions refresh`);
+					activeSessionsProvider.reload();
 					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
 					checkpointProvider.reload();
 					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');

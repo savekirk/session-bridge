@@ -91,6 +91,51 @@ suite("Session Details Panel", () => {
 		assert.strictEqual(html.match(/2026/g)?.length, 2);
 	});
 
+	test("detail renderer derives the header agent label from transcript turns when detail agent is missing", () => {
+		const html = renderSessionDetailsHtml({
+			kind: "detail",
+			detail: {
+				sessionId: "session-missing-agent",
+				source: "live",
+				promptPreview: "Agent summary fallback",
+				status: "ACTIVE",
+				startedAt: "2026-04-04T10:00:00Z",
+				lastActivityAt: "2026-04-04T10:05:00Z",
+				durationMs: 300_000,
+				checkpointCount: 1,
+				model: "sonnet",
+				transcriptAvailable: true,
+				turns: [
+					{
+						id: "turn-user",
+						actor: {
+							kind: "user",
+							name: "Save Kirk",
+							initials: "SK",
+						},
+						timestamp: "2026-04-04T10:00:00Z",
+						text: "Build a session details webview.",
+						toolActivities: [],
+					},
+					{
+						id: "turn-agent",
+						actor: {
+							kind: "agent",
+							name: "Claude Code",
+							initials: "CC",
+						},
+						timestamp: "2026-04-04T10:01:00Z",
+						text: "Grounding in the extension structure first.",
+						toolActivities: [],
+					},
+				],
+			},
+		}, { cspSource: "vscode-webview:" });
+
+		assert.ok(html.includes("Claude Code (sonnet)"));
+		assert.strictEqual(html.includes("undefined"), false);
+	});
+
 	test("detail renderer lets the header title expand beside the status badge", () => {
 		const html = renderSessionDetailsHtml({
 			kind: "detail",
@@ -157,7 +202,8 @@ suite("Session Details Panel", () => {
 		assert.strictEqual(html.includes(">Tool Execution<"), false);
 		assert.ok(html.includes("ReadFile"));
 		assert.ok(html.includes("src/components/sessionDetailsPanel.ts"));
-		assert.strictEqual(html.includes("Claude Code"), false);
+		assert.strictEqual(html.match(/class="turn__header"/g)?.length ?? 0, 0);
+		assert.strictEqual(html.match(/class="turn__author"/g)?.length ?? 0, 0);
 		assert.strictEqual(html.match(/class="avatar"/g)?.length ?? 0, 0);
 	});
 

@@ -169,6 +169,7 @@ export interface EntireSessionDetailModel {
 	turnCount?: number;
 	toolCount?: number;
 	tokenCount?: number;
+	agent?: string;
 	model?: string;
 	attribution?: InitialAttribution;
 	transcriptAvailable: boolean;

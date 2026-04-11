@@ -14,9 +14,7 @@ import { runCommandAsync } from './runCommand';
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
 const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';
-const ACTIVE_SESSIONS_VIEW_ID = 'session.bridge.entire.activeSessions';
 const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';
-const HAS_ACTIVE_SESSIONS_CONTEXT = 'session.bridge.state.has-active-sessions';
 const enum COMMAND_ID {
 	SHOW_STATUS = "session.bridge.entire.showStatus",
 	ENABLE = "session.bridge.entire.enable",
@@ -26,8 +24,6 @@ const enum COMMAND_ID {
 	BROWSE_CHECKPOINTS = "session.bridge.entire.browseCheckpoints",
 	OPEN_COMMIT_CHANGES = "session.bridge.entire.openCommitChanges",
 	OPEN_SESSION_TRANSCRIPT = "session.bridge.entire.openSessionTranscript",
-	RESUME_BRANCH = "session.bridge.entire.resumeBranch",
-	RUN_DOCTOR = "session.bridge.entire.runDoctor",
 	CLEAN = "session.bridge.entire.clean",
 	RESET = "session.bridge.entire.reset",
 	SHOW_TRACE = "session.bridge.entire.showTrace"
@@ -35,7 +31,6 @@ const enum COMMAND_ID {
 
 const TREE_VIEW_IDS = [
 	SESSIONS_VIEW_ID,
-	ACTIVE_SESSIONS_VIEW_ID,
 	CHECKPOINTS_VIEW_ID,
 ] as const;
 
@@ -48,8 +43,6 @@ const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',
 	[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',
 	[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',
-	[COMMAND_ID.RESUME_BRANCH]: 'Resume Branch Session',
-	[COMMAND_ID.RUN_DOCTOR]: 'Run Doctor',
 	[COMMAND_ID.CLEAN]: 'Clean Entire State',
 	[COMMAND_ID.RESET]: 'Reset Entire Session Data',
 	[COMMAND_ID.SHOW_TRACE]: 'Show Trace'
@@ -83,15 +76,12 @@ interface CommitChangesTarget {
 
 const setWorkspaceContext = async (
 	workspaceState: EntireStatusState,
-	hasActiveSessions: boolean,
 ) => {
 	for (const context of WORKSPACE_CONTEXT) {
 		const status = context[0] === workspaceState;
 		const key = context[1];
 		await vscode.commands.executeCommand('setContext', key, status);
 	}
-
-	await vscode.commands.executeCommand('setContext', HAS_ACTIVE_SESSIONS_CONTEXT, hasActiveSessions);
 };
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -100,7 +90,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	const initialProbeTarget = await resolveProbeTargetPath();
 	let workspaceState = await probeEntireWorkspace(initialProbeTarget);
-	await setWorkspaceContext(workspaceState.state, workspaceState.activeSessions.length > 0);
+	await setWorkspaceContext(workspaceState.state);
 	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
 	if (vscode.workspace.workspaceFolders?.length) {
 		statusBarItem.show();
@@ -121,21 +111,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const sessionCommands = {
 		refresh: COMMAND_ID.REFRESH,
 		showStatus: COMMAND_ID.SHOW_STATUS,
-		runDoctor: COMMAND_ID.RUN_DOCTOR,
 		openSessionTranscript: COMMAND_ID.OPEN_SESSION_TRANSCRIPT,
 	} satisfies SessionsViewCommands;
 	const checkpointSessionsProvider = new SessionsTreeViewProvider(
 		workspaceState,
 		initialProbeTarget,
 		sessionCommands,
-		'checkpoint',
-		outputChannel,
-	);
-	const activeSessionsProvider = new SessionsTreeViewProvider(
-		workspaceState,
-		initialProbeTarget,
-		sessionCommands,
-		'active',
 		outputChannel,
 	);
 	const sessionDetailsPanel = new SessionDetailsPanel(outputChannel);
@@ -146,18 +127,17 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		showCollapseAll: true,
 	});
 	context.subscriptions.push(checkpointSessionsTreeView);
-	const activeSessionsTreeView = vscode.window.createTreeView(ACTIVE_SESSIONS_VIEW_ID, {
-		treeDataProvider: activeSessionsProvider,
-		showCollapseAll: true,
-	});
-	context.subscriptions.push(activeSessionsTreeView);
 	const checkpointTreeView = vscode.window.createTreeView(CHECKPOINTS_VIEW_ID, {
 		treeDataProvider: checkpointProvider,
 		showCollapseAll: true,
 	});
 	context.subscriptions.push(checkpointTreeView);
 	context.subscriptions.push(checkpointTreeView.onDidChangeSelection((event) => {
-		checkpointSessionsProvider.setCheckpointSelection(getCheckpointSelectionContext(event.selection[0]));
+		const selection = getCheckpointSelectionContext(event.selection[0]);
+		outputChannel.appendLine(
+			`[checkpoint-selection] checkpointId=${selection?.checkpointId ?? "(none)"}, sessionPaths=${selection?.sessionPaths.length ?? 0}`,
+		);
+		checkpointSessionsProvider.setCheckpointSelection(selection);
 	}));
 
 	let sessionDetailLoadGeneration = 0;
@@ -199,9 +179,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		}
 	};
 	context.subscriptions.push(checkpointSessionsTreeView.onDidChangeSelection((event) => {
-		void showSelectedSessionDetail(event.selection[0]);
-	}));
-	context.subscriptions.push(activeSessionsTreeView.onDidChangeSelection((event) => {
 		void showSelectedSessionDetail(event.selection[0]);
 	}));
 
@@ -308,13 +285,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			resetAutomaticCheckpointFetchAttempt(cwd);
 		}
 		workspaceState = await probeEntireWorkspace(cwd);
-		await setWorkspaceContext(workspaceState.state, workspaceState.activeSessions.length > 0);
+		await setWorkspaceContext(workspaceState.state);
 		await updateProbeWatchers(cwd);
 		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
 		checkpointSessionsProvider.setWorkspaceState(workspaceState, cwd);
 		checkpointSessionsProvider.refresh();
-		activeSessionsProvider.setWorkspaceState(workspaceState, cwd);
-		activeSessionsProvider.refresh();
 		checkpointProvider.setWorkspaceState(workspaceState, cwd);
 		checkpointProvider.refresh();
 
@@ -357,7 +332,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		outputChannel.appendLine(`[fetch] Fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
 		await refreshWorkspaceProbe(`fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);
 		checkpointSessionsProvider.reload();
-		activeSessionsProvider.reload();
 		checkpointProvider.reload();
 		await vscode.window.showInformationMessage(`Fetched ${METADATA_BRANCH_NAME} from ${remoteName}.`);
 	};
@@ -468,8 +442,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					await refreshWorkspaceProbe('manual refresh');
 					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint sessions reload`);
 					checkpointSessionsProvider.reload();
-					outputChannel.appendLine(`[command] REFRESH: probe done, triggering active sessions refresh`);
-					activeSessionsProvider.reload();
 					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
 					checkpointProvider.reload();
 					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
@@ -535,8 +507,8 @@ function getProbeCandidatePath(): string | undefined {
  * Resolves the path the extension should use for repository-backed probes and actions.
  *
  * This converts the current active file or workspace folder path into the git
- * repository root when possible, so active-session loading, checkpoint loading,
- * and file watchers operate on the repository that actually owns the current context.
+ * repository root when possible, so checkpoint loading and file watchers operate
+ * on the repository that actually owns the current context.
  *
  * @returns Repository root for the current UI context, or the original candidate path when no git root can be resolved.
  */

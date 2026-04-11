@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
 suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
 
-	test('manifest removes recovery view but keeps recovery commands', () => {
+	test('manifest contributes checkpoint-only sessions view surface', () => {
 		const manifestPath = path.resolve(__dirname, '../../package.json');
 		const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
 			contributes?: {
@@ -22,12 +22,9 @@ suite('Extension Test Suite', () => {
 			contributedViews.some((view) => view.id === 'session.bridge.entire.recovery'),
 			false,
 		);
-		const activeSessionsView = contributedViews.find((view) => view.id === 'session.bridge.entire.activeSessions');
-		assert.ok(activeSessionsView);
-		assert.strictEqual(activeSessionsView?.name, 'Active Sessions');
 		assert.strictEqual(
-			activeSessionsView?.when,
-			'session.bridge.state.enabled && session.bridge.state.has-active-sessions',
+			contributedViews.some((view) => view.id === 'session.bridge.entire.activeSessions'),
+			false,
 		);
 		const checkpointSessionsView = contributedViews.find((view) => view.id === 'session.bridge.entire.sessions');
 		assert.ok(checkpointSessionsView);
@@ -44,8 +41,8 @@ suite('Extension Test Suite', () => {
 		);
 
 		const commands = new Set((manifest.contributes?.commands ?? []).map((command) => command.command));
-		assert.strictEqual(commands.has('session.bridge.entire.runDoctor'), true);
-		assert.strictEqual(commands.has('session.bridge.entire.resumeBranch'), true);
+		assert.strictEqual(commands.has('session.bridge.entire.runDoctor'), false);
+		assert.strictEqual(commands.has('session.bridge.entire.resumeBranch'), false);
 		assert.strictEqual(commands.has('session.bridge.entire.clean'), true);
 		assert.strictEqual(commands.has('session.bridge.entire.reset'), true);
 		assert.strictEqual(commands.has('session.bridge.entire.showTrace'), true);

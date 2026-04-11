@@ -75,23 +75,31 @@ export class FileSystemCheckpointStore extends BaseCheckpointStore {
 	 * @param sessionIndex Zero-based session index within the checkpoint.
 	 * @returns The fixture-backed session payload for that checkpoint entry.
 	 */
-	async getSessionContent(checkpointId: string, sessionIndex: number): Promise<SessionContentRecord> {
-		const summary = await this.getCheckpointSummary(checkpointId);
-		if (!summary) {
-			throw new Error(`Checkpoint not found: ${checkpointId}`);
-		}
-		if (sessionIndex < 0 || sessionIndex >= summary.sessions.length) {
-			throw new Error(`Session index ${sessionIndex} not found in checkpoint ${checkpointId}`);
+	async getSessionContent(
+		checkpointId: string,
+		sessionIndex: number,
+		sessionPaths?: SessionFilePaths,
+	): Promise<SessionContentRecord> {
+		let resolvedSessionPaths = sessionPaths;
+		if (!resolvedSessionPaths) {
+			const summary = await this.getCheckpointSummary(checkpointId);
+			if (!summary) {
+				throw new Error(`Checkpoint not found: ${checkpointId}`);
+			}
+			if (sessionIndex < 0 || sessionIndex >= summary.sessions.length) {
+				throw new Error(`Session index ${sessionIndex} not found in checkpoint ${checkpointId}`);
+			}
+
+			resolvedSessionPaths = summary.sessions[sessionIndex];
 		}
 
-		const sessionPaths = summary.sessions[sessionIndex];
 		const checkpointDir = path.join(this.rootDir, shardedCheckpointPath(checkpointId));
-		const metadataPath = resolveSessionFilePath(this.rootDir, checkpointDir, sessionPaths, "metadata");
-		const transcriptPath = resolveSessionFilePath(this.rootDir, checkpointDir, sessionPaths, "transcript");
+		const metadataPath = resolveSessionFilePath(this.rootDir, checkpointDir, resolvedSessionPaths, "metadata");
+		const transcriptPath = resolveSessionFilePath(this.rootDir, checkpointDir, resolvedSessionPaths, "transcript");
 		const transcriptDir = path.dirname(transcriptPath);
-		const contextPath = resolveSessionFilePath(this.rootDir, checkpointDir, sessionPaths, "context");
-		const promptPath = resolveSessionFilePath(this.rootDir, checkpointDir, sessionPaths, "prompt");
-		const contentHashPath = resolveSessionFilePath(this.rootDir, checkpointDir, sessionPaths, "contentHash");
+		const contextPath = resolveSessionFilePath(this.rootDir, checkpointDir, resolvedSessionPaths, "context");
+		const promptPath = resolveSessionFilePath(this.rootDir, checkpointDir, resolvedSessionPaths, "prompt");
+		const contentHashPath = resolveSessionFilePath(this.rootDir, checkpointDir, resolvedSessionPaths, "contentHash");
 
 		const rawMetadata = await readJsonFile(metadataPath);
 		if (!rawMetadata) {

@@ -2,10 +2,10 @@ import * as vscode from "vscode";
 import {
 	listSessionsForCheckpointIds,
 	type EntireSessionCard,
-	type EntireActiveSessionCard,
 	type InitialAttribution,
 	type SessionCheckpointEntry,
 	type SessionDetailTarget,
+	type SessionFilePaths,
 	type SessionTranscriptTarget,
 	type SessionStatus,
 } from "../checkpoints";
@@ -19,22 +19,18 @@ const LOAD_TIMEOUT_MS = 50_000;
 export interface SessionsViewCommands {
 	readonly refresh: string;
 	readonly showStatus: string;
-	readonly runDoctor: string;
 	readonly openSessionTranscript: string;
 }
 
 export interface CheckpointSessionSelection {
-	checkpointIds: string[];
+	checkpointId: string;
+	sessionPaths: SessionFilePaths[];
 	commitSha?: string;
 }
 
-export type SessionsTreeMode = "active" | "checkpoint";
-
 type SessionTreeCard = {
-	kind: "live" | "checkpoint";
 	sessionId: string;
 	status: SessionStatus;
-	phase?: string;
 	promptPreview: string;
 	agent?: string;
 	model?: string;
@@ -45,19 +41,11 @@ type SessionTreeCard = {
 	attribution?: InitialAttribution;
 	checkpointCount: number;
 	stepCount?: number;
-	turnCount?: number;
 	toolCount?: number;
 	tokenCount?: number;
-	checkpointIds?: string[];
+	checkpointIds: string[];
 	checkpointEntries?: SessionCheckpointEntry[];
 	lastCheckpointId?: string;
-	transcriptPath?: string;
-	worktreePath?: string;
-	worktreeId?: string;
-	baseCommit?: string;
-	hasShadowBranch: boolean;
-	isStuck: boolean;
-	canRunDoctor: boolean;
 	canOpenLastCheckpoint: boolean;
 	canOpenTranscript: boolean;
 	searchText: string;
@@ -123,7 +111,7 @@ export function getSessionDetailTarget(element: vscode.TreeItem | undefined): Se
 	return {
 		sessionId: element.card.sessionId,
 		promptPreview: element.card.promptPreview,
-		source: element.card.kind,
+		source: "checkpoint",
 		checkpointIds: element.card.checkpointIds,
 		checkpointEntries: element.card.checkpointEntries,
 	};
@@ -143,32 +131,33 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 		workspaceState: EntireWorkspaceState,
 		repoPath: string | undefined,
 		private readonly commands: SessionsViewCommands,
-		private readonly mode: SessionsTreeMode,
 		private readonly outputChannel?: vscode.OutputChannel,
-		private readonly loadCheckpointSessions: (repoPath: string, checkpointIds: string[]) => Promise<EntireSessionCard[]> = listSessionsForCheckpointIds,
+		private readonly loadCheckpointSessions: (
+			repoPath: string,
+			checkpointId: string,
+			sessionPaths: SessionFilePaths[],
+		) => Promise<EntireSessionCard[]> = listSessionsForCheckpointIds,
 	) {
 		this.workspaceState = workspaceState;
 		this.repoPath = repoPath;
-		this.loadState = buildInitialLoadState(mode, workspaceState);
+		this.loadState = buildInitialLoadState();
 		this.debug(`constructor: state=${workspaceState.state}, repoPath=${repoPath ?? "(none)"}`);
 	}
 
 	private debug(message: string): void {
-		this.outputChannel?.appendLine(`[sessions:${this.mode}] ${message}`);
+		this.outputChannel?.appendLine(`[sessions] ${message}`);
 	}
 
 	setCheckpointSelection(selection: CheckpointSessionSelection | undefined): void {
-		if (this.mode !== "checkpoint") {
-			return;
-		}
-
 		const normalizedSelection = normalizeCheckpointSelection(selection);
 		if (sameCheckpointSelection(this.selectedCheckpointSelection, normalizedSelection)) {
 			return;
 		}
 
 		this.selectedCheckpointSelection = normalizedSelection;
-		this.debug(`setCheckpointSelection: checkpointIds=${normalizedSelection?.checkpointIds.join(",") ?? "(none)"}`);
+		this.debug(
+			`setCheckpointSelection: checkpointId=${normalizedSelection?.checkpointId ?? "(none)"}, sessionPaths=${normalizedSelection?.sessionPaths.length ?? 0}`,
+		);
 
 		if (this.workspaceState.state !== EntireStatusState.ENABLED) {
 			this.changeEmitter.fire();
@@ -176,25 +165,26 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 		}
 
 		this.loadGeneration++;
-		this.loadState = buildInitialLoadState(this.mode, this.workspaceState);
+		this.loadState = buildInitialLoadState();
+		if (this.repoPath && normalizedSelection) {
+			this.startBackgroundLoad(this.repoPath);
+		}
 		this.changeEmitter.fire();
 	}
 
 	setWorkspaceState(workspaceState: EntireWorkspaceState, repoPath: string | undefined): void {
-		const previousState = this.workspaceState;
 		const repoChanged = this.repoPath !== repoPath;
-		const enabledChanged = previousState.state !== workspaceState.state;
-		const sessionSnapshotChanged = !sameSessionSnapshot(previousState.activeSessions, workspaceState.activeSessions);
+		const enabledChanged = this.workspaceState.state !== workspaceState.state;
 		if (repoChanged) {
 			this.selectedCheckpointSelection = undefined;
 		}
 		this.workspaceState = workspaceState;
 		this.repoPath = repoPath;
-		this.debug(`setWorkspaceState: state=${workspaceState.state}, repoPath=${repoPath ?? "(none)"}, repoChanged=${repoChanged}, enabledChanged=${enabledChanged}, sessionSnapshotChanged=${sessionSnapshotChanged}, loadState=${this.loadState.kind}`);
+		this.debug(`setWorkspaceState: state=${workspaceState.state}, repoPath=${repoPath ?? "(none)"}, repoChanged=${repoChanged}, enabledChanged=${enabledChanged}, loadState=${this.loadState.kind}`);
 
-		if (repoChanged || enabledChanged || (this.mode === "active" && sessionSnapshotChanged)) {
+		if (repoChanged || enabledChanged) {
 			this.loadGeneration++;
-			this.loadState = buildInitialLoadState(this.mode, workspaceState);
+			this.loadState = buildInitialLoadState();
 		}
 
 		this.changeEmitter.fire();
@@ -208,7 +198,7 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 	reload(): void {
 		this.loadGeneration++;
 		const generation = this.loadGeneration;
-		this.loadState = buildInitialLoadState(this.mode, this.workspaceState);
+		this.loadState = buildInitialLoadState();
 
 		if (this.workspaceState.state !== EntireStatusState.ENABLED || !this.repoPath) {
 			this.debug(`reload: skipped (state=${this.workspaceState.state}, repoPath=${this.repoPath ?? "(none)"}), gen=${generation}`);
@@ -216,8 +206,8 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 			return;
 		}
 
-		if (this.mode === "active") {
-			this.debug(`reload: using workspace probe snapshot, gen=${generation}`);
+		if (!hasCheckpointSelection(this.selectedCheckpointSelection)) {
+			this.debug(`reload: skipped (no checkpoint selection), gen=${generation}`);
 			this.changeEmitter.fire();
 			return;
 		}
@@ -244,18 +234,7 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 			return [];
 		}
 
-		if (this.mode === "active" && !hasLiveSessions(this.workspaceState)) {
-			return [
-				new EmptyStateItem(
-					"No active sessions",
-					"pulse",
-					"This view appears only while Entire reports live sessions for the current repository.",
-				),
-				buildRefreshAction(this.commands),
-			];
-		}
-
-		if (this.mode === "checkpoint" && !hasCheckpointSelection(this.selectedCheckpointSelection)) {
+		if (!hasCheckpointSelection(this.selectedCheckpointSelection)) {
 			return [
 				new EmptyStateItem(
 					"Select a checkpoint to view sessions",
@@ -284,22 +263,11 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 
 			case "loaded":
 				if (this.loadState.cards.length === 0) {
-					if (this.mode === "checkpoint" && hasCheckpointSelection(this.selectedCheckpointSelection)) {
-						return [
-							new EmptyStateItem(
-								"No sessions in selected checkpoint",
-								"history",
-								"The selected checkpoint does not have any resolved sessions in the current repository context.",
-							),
-							buildRefreshAction(this.commands),
-						];
-					}
-
 					return [
 						new EmptyStateItem(
-							"No active sessions",
-							"pulse",
-							"This view appears only while Entire reports live sessions for the current repository.",
+							"No sessions in selected checkpoint",
+							"history",
+							"The selected checkpoint does not have any resolved sessions in the current repository context.",
 						),
 						buildRefreshAction(this.commands),
 					];
@@ -310,17 +278,21 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 	}
 
 	private startBackgroundLoad(repoPath: string): void {
-		if (this.mode !== "checkpoint") {
+		if (!hasCheckpointSelection(this.selectedCheckpointSelection)) {
 			return;
 		}
 
 		const generation = this.loadGeneration;
 		this.loadState = { kind: "loading" };
 		const startTime = Date.now();
-		this.debug(`startBackgroundLoad: gen=${generation}, mode=checkpoint, timeout=${LOAD_TIMEOUT_MS}ms`);
+		this.debug(`startBackgroundLoad: gen=${generation}, timeout=${LOAD_TIMEOUT_MS}ms`);
 
-		const work = this.loadCheckpointSessions(repoPath, this.selectedCheckpointSelection?.checkpointIds ?? [])
-			.then((cards) => cards.map(adaptCheckpointSessionCard));
+		const selection = this.selectedCheckpointSelection;
+		const work = this.loadCheckpointSessions(
+			repoPath,
+			selection?.checkpointId ?? "",
+			selection?.sessionPaths ?? [],
+		).then((cards) => cards.map(adaptCheckpointSessionCard));
 		const timeout = new Promise<never>((_resolve, reject) => {
 			setTimeout(() => reject(new Error("Session load timed out")), LOAD_TIMEOUT_MS);
 		});
@@ -378,30 +350,12 @@ function buildSessionChildItems(card: SessionTreeCard, commands: SessionsViewCom
 		));
 	}
 
-	if (card.kind === "live" && card.lastActivityAt && card.lastActivityAt !== card.startedAt) {
+	if (card.lastActivityAt && card.lastActivityAt !== card.startedAt) {
 		items.push(new SessionDetailItem(
 			"Last Active",
 			formatShortTimestamp(card.lastActivityAt),
 			"pulse",
 			card.lastActivityAt,
-		));
-	}
-
-	if (card.kind === "live" && card.worktreePath) {
-		items.push(new SessionDetailItem(
-			"Worktree",
-			truncate(card.worktreePath, 48),
-			"folder-library",
-			card.worktreePath,
-		));
-	}
-
-	if (card.kind === "live" && card.lastCheckpointId) {
-		items.push(new SessionDetailItem(
-			"Latest Checkpoint",
-			card.lastCheckpointId,
-			"history",
-			card.lastCheckpointId,
 		));
 	}
 
@@ -424,28 +378,8 @@ function buildSessionChildItems(card: SessionTreeCard, commands: SessionsViewCom
 		items.push(new SessionDetailItem("Stats", stats, "graph"));
 	}
 
-	if (card.isStuck) {
-		items.push(new SessionDetailItem(
-			"Warning",
-			card.status === "ACTIVE" ? "Session may be stuck" : "Session needs recovery attention",
-			"warning",
-			"Entire doctor can diagnose and recover stale live session state.",
-		));
-	}
-
 	if (card.canOpenTranscript) {
 		items.push(buildTranscriptAction(card, commands.openSessionTranscript));
-	}
-
-	if (card.canRunDoctor) {
-		items.push(new SessionActionItem(
-			"Run Doctor",
-			"search",
-			{
-				command: commands.runDoctor,
-				title: "Run Doctor",
-			},
-		));
 	}
 
 	return items;
@@ -460,7 +394,7 @@ function buildTranscriptAction(card: SessionTreeCard, commandId: string): Sessio
 			title: "View Session Transcript",
 			arguments: [buildSessionTranscriptTarget(card)],
 		},
-		card.transcriptPath ? truncate(card.transcriptPath, 42) : "Committed transcript",
+		"Committed transcript",
 	);
 }
 
@@ -468,11 +402,10 @@ function buildSessionTranscriptTarget(card: SessionTreeCard): SessionTranscriptT
 	return {
 		sessionId: card.sessionId,
 		promptPreview: card.promptPreview,
-		source: card.kind,
+		source: "checkpoint",
 		checkpointIds: card.checkpointIds,
 		checkpointEntries: card.checkpointEntries,
 		lastCheckpointId: card.lastCheckpointId,
-		transcriptPath: card.transcriptPath,
 	};
 }
 
@@ -503,7 +436,7 @@ function buildSessionTooltip(card: SessionTreeCard): vscode.MarkdownString {
 	tooltip.appendMarkdown(`**Session:** ${card.sessionId}\n\n`);
 	tooltip.appendMarkdown(`**Status:** ${escapeMarkdown(card.status)}\n\n`);
 	tooltip.appendMarkdown(`**Prompt:** ${escapeMarkdown(card.promptPreview)}\n\n`);
-	tooltip.appendMarkdown(`**Source:** ${card.kind === "live" ? "Live session" : "Selected checkpoint"}\n\n`);
+	tooltip.appendMarkdown(`**Source:** Selected checkpoint\n\n`);
 
 	if (card.agent) {
 		tooltip.appendMarkdown(`**Agent:** ${escapeMarkdown(card.agent)}\n\n`);
@@ -513,12 +446,8 @@ function buildSessionTooltip(card: SessionTreeCard): vscode.MarkdownString {
 		tooltip.appendMarkdown(`**Model:** ${escapeMarkdown(card.model)}\n\n`);
 	}
 
-	if (card.kind === "live" && card.lastActivityAt && card.lastActivityAt !== card.startedAt) {
+	if (card.lastActivityAt && card.lastActivityAt !== card.startedAt) {
 		tooltip.appendMarkdown(`**Last Active:** ${escapeMarkdown(card.lastActivityAt)}\n\n`);
-	}
-
-	if (card.kind === "live" && card.worktreePath) {
-		tooltip.appendMarkdown(`**Worktree:** ${escapeMarkdown(card.worktreePath)}\n\n`);
 	}
 
 	if (card.lastCheckpointId) {
@@ -543,10 +472,6 @@ function buildSessionTooltip(card: SessionTreeCard): vscode.MarkdownString {
 		tooltip.appendMarkdown(`**Checkpoints:** ${card.checkpointCount}\n\n`);
 	}
 
-	if (card.isStuck) {
-		tooltip.appendMarkdown(`**Warning:** Session may be stuck\n\n`);
-	}
-
 	return tooltip;
 }
 
@@ -561,11 +486,7 @@ function buildStats(card: SessionTreeCard): string | undefined {
 		parts.push(`${card.checkpointCount} checkpoint${card.checkpointCount === 1 ? "" : "s"}`);
 	}
 
-	if (typeof card.turnCount === "number") {
-		parts.push(`${card.turnCount} turn${card.turnCount === 1 ? "" : "s"}`);
-	}
-
-	if (typeof card.stepCount === "number" && typeof card.turnCount !== "number") {
+	if (typeof card.stepCount === "number") {
 		parts.push(`${card.stepCount} step${card.stepCount === 1 ? "" : "s"}`);
 	}
 
@@ -577,11 +498,7 @@ function buildStats(card: SessionTreeCard): string | undefined {
 }
 
 function selectSessionIcon(card: SessionTreeCard): string {
-	if (card.isStuck) {
-		return "warning";
-	}
-
-	if (card.kind === "checkpoint" && card.status === "ENDED") {
+	if (card.status === "ENDED") {
 		return "history";
 	}
 
@@ -750,46 +667,12 @@ function sortCards(cards: SessionTreeCard[]): SessionTreeCard[] {
 	});
 }
 
-function sameSessionSnapshot(left: EntireActiveSessionCard[], right: EntireActiveSessionCard[]): boolean {
-	if (left.length !== right.length) {
-		return false;
-	}
-
-	for (let index = 0; index < left.length; index += 1) {
-		const leftCard = left[index];
-		const rightCard = right[index];
-		if (
-			leftCard?.sessionId !== rightCard?.sessionId
-			|| leftCard?.status !== rightCard?.status
-			|| leftCard?.lastInteractionAt !== rightCard?.lastInteractionAt
-			|| leftCard?.promptPreview !== rightCard?.promptPreview
-			|| leftCard?.lastCheckpointId !== rightCard?.lastCheckpointId
-			|| leftCard?.attribution?.calculatedAt !== rightCard?.attribution?.calculatedAt
-			|| leftCard?.attribution?.agentLines !== rightCard?.attribution?.agentLines
-			|| leftCard?.attribution?.totalCommitted !== rightCard?.attribution?.totalCommitted
-			|| leftCard?.attribution?.agentPercentage !== rightCard?.attribution?.agentPercentage
-		) {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-function buildInitialLoadState(mode: SessionsTreeMode, workspaceState: EntireWorkspaceState): LoadState {
-	if (mode === "active") {
-		return { kind: "loaded", cards: sortCards(workspaceState.activeSessions.map(adaptLiveCard)) };
-	}
-
+function buildInitialLoadState(): LoadState {
 	return { kind: "ready" };
 }
 
-function hasLiveSessions(workspaceState: EntireWorkspaceState): boolean {
-	return workspaceState.state === EntireStatusState.ENABLED && workspaceState.activeSessions.length > 0;
-}
-
 function hasCheckpointSelection(selection: CheckpointSessionSelection | undefined): selection is CheckpointSessionSelection {
-	return !!selection && selection.checkpointIds.length > 0;
+	return !!selection && selection.checkpointId.length > 0;
 }
 
 function normalizeCheckpointSelection(selection: CheckpointSessionSelection | undefined): CheckpointSessionSelection | undefined {
@@ -797,13 +680,14 @@ function normalizeCheckpointSelection(selection: CheckpointSessionSelection | un
 		return undefined;
 	}
 
-	const checkpointIds = [...new Set(selection.checkpointIds.filter((checkpointId) => checkpointId.length > 0))];
-	if (checkpointIds.length === 0) {
+	const checkpointId = selection.checkpointId.trim();
+	if (checkpointId.length === 0) {
 		return undefined;
 	}
 
 	return {
-		checkpointIds,
+		checkpointId,
+		sessionPaths: selection.sessionPaths.filter((paths) => typeof paths.metadata === "string" && paths.metadata.length > 0),
 		commitSha: selection.commitSha,
 	};
 }
@@ -820,48 +704,30 @@ function sameCheckpointSelection(
 		return false;
 	}
 
-	if (left.commitSha !== right.commitSha || left.checkpointIds.length !== right.checkpointIds.length) {
+	if (left.commitSha !== right.commitSha || left.checkpointId !== right.checkpointId) {
 		return false;
 	}
 
-	return left.checkpointIds.every((checkpointId, index) => checkpointId === right.checkpointIds[index]);
+	return sameSessionPaths(left.sessionPaths, right.sessionPaths);
 }
 
-function adaptLiveCard(card: EntireActiveSessionCard): SessionTreeCard {
-	return {
-		kind: "live",
-		sessionId: card.sessionId,
-		status: card.status,
-		phase: card.phase,
-		promptPreview: card.promptPreview,
-		agent: card.agent,
-		model: card.model,
-		author: card.author,
-		startedAt: card.startedAt,
-		lastActivityAt: card.lastInteractionAt,
-		durationMs: card.durationMs,
-		attribution: card.attribution,
-		checkpointCount: card.checkpointCount,
-		turnCount: card.turnCount,
-		tokenCount: card.tokenCount,
-		checkpointIds: card.lastCheckpointId ? [card.lastCheckpointId] : [],
-		lastCheckpointId: card.lastCheckpointId,
-		transcriptPath: card.transcriptPath,
-		worktreePath: card.worktreePath,
-		worktreeId: card.worktreeId,
-		baseCommit: card.baseCommit,
-		hasShadowBranch: card.hasShadowBranch,
-		isStuck: card.isStuck,
-		canRunDoctor: card.canRunDoctor,
-		canOpenLastCheckpoint: card.canOpenLastCheckpoint,
-		canOpenTranscript: card.canOpenTranscript,
-		searchText: card.searchText,
-	};
+function sameSessionPaths(left: SessionFilePaths[], right: SessionFilePaths[]): boolean {
+	if (left.length !== right.length) {
+		return false;
+	}
+
+	return left.every((paths, index) => {
+		const other = right[index];
+		return other?.metadata === paths.metadata
+			&& other?.transcript === paths.transcript
+			&& other?.context === paths.context
+			&& other?.prompt === paths.prompt
+			&& other?.contentHash === paths.contentHash;
+	});
 }
 
 function adaptCheckpointSessionCard(card: EntireSessionCard): SessionTreeCard {
 	return {
-		kind: "checkpoint",
 		sessionId: card.sessionId,
 		status: card.status,
 		promptPreview: card.promptPreview,
@@ -876,12 +742,9 @@ function adaptCheckpointSessionCard(card: EntireSessionCard): SessionTreeCard {
 		stepCount: card.stepCount,
 		toolCount: card.toolCount,
 		tokenCount: card.tokenCount,
-		checkpointIds: card.checkpointIds,
+		checkpointIds: [...card.checkpointIds],
 		checkpointEntries: card.checkpointEntries,
 		lastCheckpointId: card.latestCheckpointId,
-		hasShadowBranch: false,
-		isStuck: false,
-		canRunDoctor: false,
 		canOpenLastCheckpoint: typeof card.latestCheckpointId === "string" && card.latestCheckpointId.length > 0,
 		canOpenTranscript: card.checkpointEntries?.some((entry) => typeof entry.session.transcript === "string" && entry.session.transcript.length > 0) ?? false,
 		searchText: card.searchText,

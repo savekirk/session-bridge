@@ -1419,9 +1419,10 @@ function splitMessagePresentation(message: ParsedNativeTranscriptMessage): {
 	const auxiliaryBlocks = contentValue !== undefined
 		? extractAuxiliaryBlocksFromContent(contentValue, message.id)
 		: [];
-	let primaryText = contentValue !== undefined
-		? extractVisibleMessageText(contentValue)
-		: message.content;
+	let primaryText = message.content;
+	if (primaryText === undefined && contentValue !== undefined) {
+		primaryText = extractVisibleMessageText(contentValue);
+	}
 
 	if (message.author === "reasoning") {
 		if (message.content) {

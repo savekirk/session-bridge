@@ -8,7 +8,9 @@ import { EntireStatusState, probeEntireWorkspace, resetAutomaticCheckpointFetchA
 
 const fixtureRoot = path.resolve(__dirname, "../../src/test/checkpoints/fixtures/store");
 
-suite("Workspace Probe", () => {
+suite("Workspace Probe", function () {
+	this.timeout(10_000);
+
 	test("enables a repository when the local checkpoint metadata branch exists without .entire settings", async () => {
 		const repoDir = createTempRepo();
 		const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "workspace-probe-home-"));

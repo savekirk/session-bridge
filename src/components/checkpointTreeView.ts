@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { EntireStatusState, EntireWorkspaceState } from "../workspaceProbe";
 import { CheckpointDateGroup, listCheckpointSummaries, CommitCheckpointGroup, ResolvedCheckpointRef, totalTokenUsage } from "../checkpoints";
+import type { CheckpointSessionSelection } from "./sessionsTreeView";
 
 const CONTEXT_CHECKPOINT_COMMITTED = "session-bridge-checkpoint-committed";
 const CONTEXT_CHECKPOINT_EPHEMERAL = "session-bridge-checkpoint-ephemeral";
@@ -9,11 +10,6 @@ const CONTEXT_CHECKPOINT_DETAIL = "session-bridge-checkpoint-detail";
 export interface CheckpointViewCommands {
 	readonly refresh: string;
 	readonly openCommitChanges: string;
-}
-
-export interface CheckpointSelectionContext {
-	checkpointIds: string[];
-	commitSha?: string;
 }
 
 export class ToplevelCheckpointTreeItem extends vscode.TreeItem {
@@ -57,7 +53,7 @@ class CheckpointDetailItem extends vscode.TreeItem {
 		icon: string,
 		tooltip?: string,
 		command?: vscode.Command,
-		public readonly selectionContext?: CheckpointSelectionContext,
+		public readonly selectionContext?: CheckpointSessionSelection,
 	) {
 		super(label, vscode.TreeItemCollapsibleState.None);
 		this.description = description;
@@ -254,7 +250,7 @@ export class CheckpointTreeViewProvider implements vscode.TreeDataProvider<vscod
 	}
 }
 
-export function getCheckpointSelectionContext(element: vscode.TreeItem | undefined): CheckpointSelectionContext | undefined {
+export function getCheckpointSelectionContext(element: vscode.TreeItem | undefined): CheckpointSessionSelection | undefined {
 	if (!element) {
 		return undefined;
 	}
@@ -495,9 +491,14 @@ function selectRepresentativeCheckpoint(card: CommitCheckpointGroup): ResolvedCh
 	return card.checkpoints.find((entry) => entry.summary !== null) ?? card.checkpoints.at(0);
 }
 
-function buildCheckpointSelectionContext(card: CommitCheckpointGroup): CheckpointSelectionContext {
+function buildCheckpointSelectionContext(card: CommitCheckpointGroup): CheckpointSessionSelection | undefined {
+	const checkpoint = selectRepresentativeCheckpoint(card);
+	if (!checkpoint || !checkpoint.summary) {
+		return undefined;
+	}
 	return {
-		checkpointIds: card.checkpoints.map((checkpoint) => checkpoint.checkpointId),
+		checkpointId: checkpoint.checkpointId,
+		sessionPaths: [...checkpoint.summary.sessions],
 		commitSha: card.commit.sha,
 	};
 }

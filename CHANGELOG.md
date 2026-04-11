@@ -7,3 +7,5 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 - Initial release
+- Reused checkpoint summary `sessionPaths` when loading sessions for a selected checkpoint, falling back to checkpoint-id lookup only when those paths are unavailable.
+- Removed the active-sessions tree surface from the Sessions view so it now shows only sessions for the selected checkpoint.

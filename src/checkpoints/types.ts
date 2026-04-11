@@ -142,7 +142,7 @@ export interface CheckpointStore {
 	listCheckpointIds(): Promise<string[]>;
 	listCheckpoints(): Promise<CheckpointSummaryRecord[]>;
 	getCheckpointSummary(checkpointId: string): Promise<CheckpointSummaryRecord | null>;
-	getSessionContent(checkpointId: string, sessionIndex: number): Promise<SessionContentRecord>;
+	getSessionContent(checkpointId: string, sessionIndex: number, sessionPaths?: SessionFilePaths): Promise<SessionContentRecord>;
 	getSessionContentById(checkpointId: string, sessionId: string): Promise<SessionContentRecord>;
 	listSessions(): Promise<SessionRecord[]>;
 }

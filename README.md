@@ -1,10 +1,13 @@
-# session-bridge README
+# Session Bridge
 
-This is the README for your extension "session-bridge". After writing up a brief description, we recommend including the following sections.
+Session Bridge is a VS Code extension for browsing Entire checkpoints and the committed sessions captured in those checkpoints from the current repository.
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+- Browse committed checkpoints grouped by authored date.
+- Select a checkpoint to load only the sessions captured in that checkpoint.
+- Reuse checkpoint summary `sessionPaths` that were already resolved by the Checkpoints tree, so selecting a checkpoint does not reprocess the same checkpoint summary just to locate its session files again.
+- Keep the Sessions tree checkpoint-driven, so it only reflects the currently selected checkpoint instead of mixing in live-session state.
 
 For example if there is an image subfolder under your extension project workspace:
 

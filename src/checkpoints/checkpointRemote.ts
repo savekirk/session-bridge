@@ -3,7 +3,7 @@ import { runCommandAsync } from "../runCommand";
 import { GitCheckpointStore } from "./gitStore";
 import { BaseCheckpointStore } from "./store";
 import { METADATA_BRANCH_NAME, isCheckpointId } from "./util";
-import type { CheckpointSummaryRecord, SessionContentRecord } from "./types";
+import type { CheckpointSummaryRecord, SessionContentRecord, SessionFilePaths } from "./types";
 
 const CHECKPOINT_TOKEN_ENV_VAR = "ENTIRE_CHECKPOINT_TOKEN";
 const ORIGIN_REMOTE_NAME = "origin";
@@ -82,15 +82,21 @@ export class ResolvedCheckpointStore extends BaseCheckpointStore {
 		return null;
 	}
 
-	async getSessionContent(checkpointId: string, sessionIndex: number): Promise<SessionContentRecord> {
+	async getSessionContent(
+		checkpointId: string,
+		sessionIndex: number,
+		sessionPaths?: SessionFilePaths,
+	): Promise<SessionContentRecord> {
 		for (const { store } of this.sources) {
-			const summary = await store.getCheckpointSummary(checkpointId);
-			if (summary === null) {
-				continue;
+			if (!sessionPaths) {
+				const summary = await store.getCheckpointSummary(checkpointId);
+				if (summary === null) {
+					continue;
+				}
 			}
 
 			try {
-				return await store.getSessionContent(checkpointId, sessionIndex);
+				return await store.getSessionContent(checkpointId, sessionIndex, sessionPaths);
 			} catch {
 				continue;
 			}

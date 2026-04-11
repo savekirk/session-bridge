@@ -11,7 +11,7 @@ import {
 	shardedCheckpointPath,
 	validateCheckpointId,
 } from "./util";
-import type { CheckpointSummaryRecord, JsonObject, SessionContentRecord } from "./types";
+import type { CheckpointSummaryRecord, JsonObject, SessionContentRecord, SessionFilePaths } from "./types";
 
 /**
  * Checkpoint store that reads committed metadata directly from git object storage on
@@ -65,12 +65,19 @@ export class GitCheckpointStore extends BaseCheckpointStore {
 	 * @param sessionIndex Zero-based session index within the checkpoint.
 	 * @returns The full committed session payload for that checkpoint entry.
 	 */
-	async getSessionContent(checkpointId: string, sessionIndex: number): Promise<SessionContentRecord> {
+	async getSessionContent(
+		checkpointId: string,
+		sessionIndex: number,
+		sessionPaths?: SessionFilePaths,
+	): Promise<SessionContentRecord> {
 		validateCheckpointId(checkpointId);
-		const basePath = shardedCheckpointPath(checkpointId);
-		const sessionPath = `${basePath}/${sessionIndex}`;
+		const sessionPath = resolveGitSessionPath(checkpointId, sessionIndex, sessionPaths);
 
-		const metadataText = await readGitText(this.repoPath, this.metadataRevision, `${sessionPath}/metadata.json`);
+		const metadataText = await readGitText(
+			this.repoPath,
+			this.metadataRevision,
+			resolveGitSessionFilePath(sessionPath, sessionPaths?.metadata, "metadata.json"),
+		);
 		if (!metadataText) {
 			throw new Error(`Session ${sessionIndex} not found in checkpoint ${checkpointId}`);
 		}
@@ -87,9 +94,21 @@ export class GitCheckpointStore extends BaseCheckpointStore {
 				},
 				readEntryText: async (entryName) => readGitText(this.repoPath, this.metadataRevision, `${sessionPath}/${entryName}`),
 			}),
-			context: await readGitText(this.repoPath, this.metadataRevision, `${sessionPath}/context.md`),
-			prompts: await readGitText(this.repoPath, this.metadataRevision, `${sessionPath}/prompt.txt`),
-			contentHash: await readGitText(this.repoPath, this.metadataRevision, `${sessionPath}/content_hash.txt`),
+			context: await readGitText(
+				this.repoPath,
+				this.metadataRevision,
+				resolveGitSessionFilePath(sessionPath, sessionPaths?.context, "context.md"),
+			),
+			prompts: await readGitText(
+				this.repoPath,
+				this.metadataRevision,
+				resolveGitSessionFilePath(sessionPath, sessionPaths?.prompt, "prompt.txt"),
+			),
+			contentHash: await readGitText(
+				this.repoPath,
+				this.metadataRevision,
+				resolveGitSessionFilePath(sessionPath, sessionPaths?.contentHash, "content_hash.txt"),
+			),
 		};
 	}
 
@@ -120,6 +139,34 @@ export class GitCheckpointStore extends BaseCheckpointStore {
 		const checkpointId = await this.findCheckpointIdForCommit(commitish);
 		return checkpointId ? this.getCheckpointSummary(checkpointId) : null;
 	}
+}
+
+function resolveGitSessionPath(
+	checkpointId: string,
+	sessionIndex: number,
+	sessionPaths?: SessionFilePaths,
+): string {
+	const metadataPath = normalizeGitTreePath(sessionPaths?.metadata);
+	if (metadataPath) {
+		const slashIndex = metadataPath.lastIndexOf("/");
+		if (slashIndex > 0) {
+			return metadataPath.slice(0, slashIndex);
+		}
+	}
+
+	return `${shardedCheckpointPath(checkpointId)}/${sessionIndex}`;
+}
+
+function resolveGitSessionFilePath(sessionPath: string, filePath: string | undefined, fallbackFileName: string): string {
+	return normalizeGitTreePath(filePath) ?? `${sessionPath}/${fallbackFileName}`;
+}
+
+function normalizeGitTreePath(value: string | undefined): string | undefined {
+	if (!value) {
+		return undefined;
+	}
+
+	return value.replace(/^\//, "");
 }
 
 async function readCommitBody(repoPath: string, commitish: string): Promise<string | null> {

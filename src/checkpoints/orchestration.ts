@@ -4,6 +4,7 @@ import type {
 	CheckpointSummaryRecord,
 	InitialAttribution,
 	SessionContentRecord,
+	SessionFilePaths,
 	SummaryRecord,
 } from "./types";
 import type {
@@ -267,66 +268,62 @@ export async function listSessionCards(repoPath: string): Promise<EntireSessionC
 }
 
 /**
- * Resolves session cards scoped to a selected set of checkpoint IDs.
+ * Resolves session cards scoped to a selected checkpoint.
  *
- * Unlike the broader session browser model, this stays anchored to the selected
- * checkpoint context and does not merge in sessions from unrelated checkpoints
- * on the active branch.
+ * When checkpoint summary `sessionPaths` are already available from the
+ * checkpoint tree, this reuses them to load committed sessions directly and
+ * avoids re-reading the summary only to resolve the same paths again. When the
+ * paths are empty, it falls back to loading the checkpoint summary by ID.
  *
  * @param repoPath Repository root used to load checkpoint metadata and live status overlays.
- * @param checkpointIds Checkpoint IDs currently selected in the checkpoint tree.
- * @returns Session cards that belong to the selected checkpoints.
+ * @param checkpointId Checkpoint ID currently selected in the checkpoint tree.
+ * @param sessionPaths Session file paths already resolved for the selected checkpoint.
+ * @returns Session cards that belong to the selected checkpoint.
  */
-export async function listSessionsForCheckpointIds(repoPath: string, checkpointIds: string[]): Promise<EntireSessionCard[]> {
-	const normalizedIds = sortUnique(
-		checkpointIds.filter((checkpointId): checkpointId is string => typeof checkpointId === "string" && checkpointId.length > 0),
-	);
-	if (normalizedIds.length === 0) {
-		return [];
-	}
-
-	const selectedCheckpointIds = new Set(normalizedIds);
-	const [stateIndex, gitEnrichment] = await Promise.all([
+export async function listSessions(repoPath: string, checkpointId: string, sessionPaths: SessionFilePaths[]): Promise<EntireSessionCard[]> {
+	const normalizedSessionPaths = sessionPaths.filter((entry) => typeof entry.metadata === "string" && entry.metadata.length > 0);
+	const [stateIndex, gitEnrichment, store] = await Promise.all([
 		loadSessionStateIndex(repoPath),
 		buildGitEnrichmentIndex(repoPath),
+		resolveCheckpointStore(
+			repoPath,
+			normalizedSessionPaths.length > 0 ? {} : { requiredCheckpointIds: [checkpointId] },
+		),
 	]);
 	const commitsByCheckpointId = new Map<string, CheckpointCommit[]>();
 
 	for (const commit of gitEnrichment.checkpointCommits) {
-		for (const checkpointId of commit.checkpointIds) {
-			if (!selectedCheckpointIds.has(checkpointId)) {
+		for (const associatedCheckpointId of commit.checkpointIds) {
+			if (associatedCheckpointId !== checkpointId) {
 				continue;
 			}
 
-			const existing = commitsByCheckpointId.get(checkpointId);
+			const existing = commitsByCheckpointId.get(associatedCheckpointId);
 			if (existing) {
 				existing.push(commit);
 			} else {
-				commitsByCheckpointId.set(checkpointId, [commit]);
+				commitsByCheckpointId.set(associatedCheckpointId, [commit]);
 			}
 		}
 	}
 
-	const store = await resolveCheckpointStore(repoPath, { requiredCheckpointIds: normalizedIds });
-	const checkpoints = (await Promise.all(normalizedIds.map<Promise<LoadedCheckpointRecord | null>>(async (checkpointId) => {
-		const summary = await store.getCheckpointSummary(checkpointId);
-		if (!summary) {
-			return null;
-		}
+	const summary = normalizedSessionPaths.length === 0
+		? await store.getCheckpointSummary(checkpointId)
+		: null;
+	const sessions = normalizedSessionPaths.length > 0
+		? await loadSessionsAtPathsWithRecovery(store, checkpointId, normalizedSessionPaths)
+		: summary
+			? await loadSessionsWithRecovery(store, checkpointId, summary)
+			: [];
+	const checkpoint: LoadedCheckpointRecord = {
+		checkpointId,
+		summary,
+		sessions,
+		rewindPoints: [],
+		commits: commitsByCheckpointId.get(checkpointId) ?? [],
+	};
 
-		const checkpoint: LoadedCheckpointRecord = {
-			checkpointId,
-			summary,
-			sessions: await loadSessionsWithRecovery(store, checkpointId, summary),
-			rewindPoints: [],
-			commits: commitsByCheckpointId.get(checkpointId) ?? [],
-		};
-
-		return checkpoint;
-	})))
-		.filter((checkpoint): checkpoint is LoadedCheckpointRecord => checkpoint !== null);
-
-	return sortSessionCards([...buildCommittedSessionCardMap(checkpoints, stateIndex).values()]);
+	return sortSessionCards([...buildCommittedSessionCardMap([checkpoint], stateIndex).values()]);
 }
 
 /**
@@ -338,7 +335,11 @@ export async function listSessionsForCheckpointIds(repoPath: string, checkpointI
  */
 export async function getSessionDetail(repoPath: string, target: SessionDetailTarget): Promise<EntireSessionDetailModel | null> {
 	const userDisplayName = await resolveUserDisplayName(repoPath);
-	if (target.source === "checkpoint" && (target.checkpointEntries?.length ?? 0) > 0) {
+	if (target.source === "checkpoint") {
+		if ((target.checkpointEntries?.length ?? 0) === 0) {
+			return null;
+		}
+
 		const stateIndex = await loadSessionStateIndex(repoPath);
 		return buildCheckpointSessionDetailModelFromEntries(target, target.checkpointEntries ?? [], stateIndex, userDisplayName);
 	}
@@ -360,15 +361,11 @@ export async function getSessionDetail(repoPath: string, target: SessionDetailTa
 	))))
 		.filter((checkpoint): checkpoint is LoadedCheckpointRecord => checkpoint !== null);
 
-	if (target.source === "live") {
-		if (!liveState) {
-			return null;
-		}
-
-		return buildLiveSessionDetailModel(liveState, checkpoints, target, userDisplayName);
+	if (!liveState) {
+		return null;
 	}
 
-	return buildCheckpointSessionDetailModel(target, checkpoints, detailContext.stateIndex, userDisplayName);
+	return buildLiveSessionDetailModel(liveState, checkpoints, target, userDisplayName);
 }
 
 /**
@@ -541,9 +538,9 @@ export async function getRawTranscript(
 		return session.transcript;
 	}
 
-	const sessions = (await Promise.all(summary.sessions.map(async (_session, index) => {
+	const sessions = (await Promise.all(summary.sessions.map(async (sessionPaths, index) => {
 		try {
-			return await store.getSessionContent(checkpointId, index);
+			return await store.getSessionContent(checkpointId, index, sessionPaths);
 		} catch {
 			return null;
 		}
@@ -1094,22 +1091,6 @@ async function buildLiveSessionDetailModel(
 	};
 }
 
-function buildCheckpointSessionDetailModel(
-	target: SessionDetailTarget,
-	checkpoints: LoadedCheckpointRecord[],
-	stateIndex: SessionStateIndex,
-	userDisplayName: string | undefined,
-): EntireSessionDetailModel | null {
-	const sessionEntries = checkpoints.flatMap((checkpoint) => checkpoint.sessions
-		.filter((session) => session.metadata.sessionId === target.sessionId)
-		.map((session) => ({
-			checkpointId: checkpoint.checkpointId,
-			session,
-			checkpointTokenUsage: checkpoint.summary?.tokenUsage,
-		})));
-	return buildCheckpointSessionDetailModelFromEntries(target, sessionEntries, stateIndex, userDisplayName);
-}
-
 function buildCheckpointSessionDetailModelFromEntries(
 	target: SessionDetailTarget,
 	sessionEntries: ReadonlyArray<Pick<SessionCheckpointEntry, "checkpointId" | "session" | "checkpointTokenUsage">>,
@@ -1438,9 +1419,26 @@ async function loadSessionsWithRecovery(
 	summary: CheckpointSummaryRecord,
 ): Promise<SessionContentRecord[]> {
 	const results = await Promise.all(
-		summary.sessions.map(async (_session, index) => {
+		summary.sessions.map(async (sessionPaths, index) => {
 			try {
-				return await store.getSessionContent(checkpointId, index);
+				return await store.getSessionContent(checkpointId, index, sessionPaths);
+			} catch {
+				return null;
+			}
+		}),
+	);
+	return results.filter((session): session is SessionContentRecord => session !== null);
+}
+
+async function loadSessionsAtPathsWithRecovery(
+	store: BaseCheckpointStore,
+	checkpointId: string,
+	sessionPaths: SessionFilePaths[],
+): Promise<SessionContentRecord[]> {
+	const results = await Promise.all(
+		sessionPaths.map(async (paths, index) => {
+			try {
+				return await store.getSessionContent(checkpointId, index, paths);
 			} catch {
 				return null;
 			}

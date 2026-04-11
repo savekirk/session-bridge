@@ -4,6 +4,7 @@ import type {
 	CheckpointSummaryRecord,
 	SessionCheckpointRecord,
 	SessionContentRecord,
+	SessionFilePaths,
 	SessionRecord,
 } from "./types";
 
@@ -38,7 +39,11 @@ export abstract class BaseCheckpointStore implements CheckpointStore {
 	 * @param sessionIndex Zero-based session index within the checkpoint.
 	 * @returns The full committed session payload for that checkpoint entry.
 	 */
-	abstract getSessionContent(checkpointId: string, sessionIndex: number): Promise<SessionContentRecord>;
+	abstract getSessionContent(
+		checkpointId: string,
+		sessionIndex: number,
+		sessionPaths?: SessionFilePaths,
+	): Promise<SessionContentRecord>;
 
 	/**
 	 * Resolves a checkpoint session by `sessionId` instead of numeric index.
@@ -54,7 +59,7 @@ export abstract class BaseCheckpointStore implements CheckpointStore {
 		}
 
 		for (let index = 0; index < summary.sessions.length; index += 1) {
-			const content = await this.getSessionContent(checkpointId, index);
+			const content = await this.getSessionContent(checkpointId, index, summary.sessions[index]);
 			if (content.metadata.sessionId === sessionId) {
 				return content;
 			}
@@ -99,7 +104,7 @@ export abstract class BaseCheckpointStore implements CheckpointStore {
 
 		for (const checkpoint of await this.listCheckpoints()) {
 			for (let index = 0; index < checkpoint.sessions.length; index += 1) {
-				const content = await this.getSessionContent(checkpoint.checkpointId, index);
+				const content = await this.getSessionContent(checkpoint.checkpointId, index, checkpoint.sessions[index]);
 				const sessionId = content.metadata.sessionId;
 				if (!sessionId) {
 					continue;
@@ -174,7 +179,7 @@ async function latestCheckpointTimestamp(
 	try {
 		const sessions = (await Promise.all(checkpoint.sessions.map(async (_session, index) => {
 			try {
-				return await store.getSessionContent(checkpoint.checkpointId, index);
+				return await store.getSessionContent(checkpoint.checkpointId, index, checkpoint.sessions[index]);
 			} catch {
 				return null;
 			}

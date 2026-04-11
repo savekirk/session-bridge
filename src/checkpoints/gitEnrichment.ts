@@ -103,7 +103,7 @@ function getLatestCreatedAtForCheckpoint(
 
 		const createdAtValues = await Promise.all(summary.sessions.map(async (_session, index) => {
 			try {
-				const session = await store.getSessionContent(checkpointId, index);
+				const session = await store.getSessionContent(checkpointId, index, summary.sessions[index]);
 				return parseTimestamp(session.metadata.createdAt) ?? 0;
 			} catch {
 				return 0;

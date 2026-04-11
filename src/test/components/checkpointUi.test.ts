@@ -5,7 +5,7 @@ import {
 	getCheckpointSelectionContext,
 	type CheckpointViewCommands,
 } from "../../components/checkpointTreeView";
-import type { CommitCheckpointGroup } from "../../checkpoints";
+import type { CommitCheckpointGroup, SessionFilePaths } from "../../checkpoints";
 import { EntireStatusState } from "../../workspaceProbe";
 
 suite("Checkpoint UI", () => {
@@ -91,6 +91,15 @@ suite("Checkpoint UI", () => {
 
 	test("checkpoint selection context is available on commit rows and detail rows", () => {
 		const commands = createCheckpointCommands();
+		const sessionPaths: SessionFilePaths[] = [
+			{
+				metadata: "/a3/f9c2b1/0/metadata.json",
+				transcript: "/a3/f9c2b1/0/full.jsonl",
+				context: "/a3/f9c2b1/0/context.md",
+				prompt: "/a3/f9c2b1/0/prompt.txt",
+				contentHash: "/a3/f9c2b1/0/content_hash.txt",
+			},
+		];
 		const card: CommitCheckpointGroup = {
 			commit: {
 				sha: "1234567890abcdef",
@@ -108,7 +117,14 @@ suite("Checkpoint UI", () => {
 			checkpoints: [
 				{
 					checkpointId: "a3f9c2b1",
-					summary: null,
+					summary: {
+						checkpointId: "a3f9c2b1",
+						strategy: "manual-commit",
+						checkpointsCount: 1,
+						filesTouched: ["src/auth.ts"],
+						sessions: sessionPaths,
+						raw: {},
+					},
 					rewindPoints: [],
 				},
 				{
@@ -131,11 +147,13 @@ suite("Checkpoint UI", () => {
 		const detailItems = provider.getChildren(treeItem);
 
 		assert.deepStrictEqual(getCheckpointSelectionContext(treeItem), {
-			checkpointIds: ["a3f9c2b1", "b4c5d6e7"],
+			checkpointId: "a3f9c2b1",
+			sessionPaths,
 			commitSha: "1234567890abcdef",
 		});
 		assert.deepStrictEqual(getCheckpointSelectionContext(detailItems[0]), {
-			checkpointIds: ["a3f9c2b1", "b4c5d6e7"],
+			checkpointId: "a3f9c2b1",
+			sessionPaths,
 			commitSha: "1234567890abcdef",
 		});
 	});

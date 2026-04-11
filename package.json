@@ -31,12 +31,6 @@
           "icon": "media/dark/history.svg"
         },
         {
-          "id": "session.bridge.entire.activeSessions",
-          "name": "Active Sessions",
-          "icon": "media/dark/play.svg",
-          "when": "session.bridge.state.enabled && session.bridge.state.has-active-sessions"
-        },
-        {
           "id": "session.bridge.entire.sessions",
           "name": "Checkpoint Sessions",
           "icon": "media/dark/history.svg"
@@ -119,16 +113,6 @@
       {
         "command": "session.bridge.entire.browseCheckpoints",
         "title": "Browse Checkpoints",
-        "category": "Session Bridge (Entire)"
-      },
-      {
-        "command": "session.bridge.entire.resumeBranch",
-        "title": "Resume Branch Session",
-        "category": "Session Bridge (Entire)"
-      },
-      {
-        "command": "session.bridge.entire.runDoctor",
-        "title": "Run Doctor",
         "category": "Session Bridge (Entire)"
       },
       {

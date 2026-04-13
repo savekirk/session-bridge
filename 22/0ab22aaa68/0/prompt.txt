@@ -1,0 +1,9 @@
+Update [sessionsTreeView.ts](src/components/sessionsTreeView.ts) [extension.ts](src/extension.ts) and any related module to return data as defined by `SessionCheckpointEntry` in [models.ts](src/checkpoints/models.ts) . A selected session should already have the information needed to load the related details for the [sessionDetailsPanel.ts](src/components/sessionDetailsPanel.ts) . Should make sure the right conversation history/transcript is loaded and parsed with no fallback to unrelated conversation history
+
+---
+
+`listSessions` in [orchestration.ts](src/checkpoints/orchestration.ts) must accept a session ID and always make sure whatever is loaded, parsed and processed has the same session id. Update the necessary callers and tests with the new change
+
+---
+
+Never use the current user's name from git for session details that are not live. The should be derived from the commit associated with the session. Everything in [sessionDetailsPanel.ts](src/components/sessionDetailsPanel.ts) must be related to the selected session id. A session does not mean it's from the current user. Can be from any user. Review the computation of the session details header and conversation to make sure it's all related and accurate

@@ -1,0 +1,97 @@
+{
+  "cli_version": "0.5.4",
+  "checkpoint_id": "220ab22aaa68",
+  "session_id": "019d7ecc-68b7-7783-b52d-6bb5efe46f26",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-13T07:17:56.092971Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    "src/checkpoints/models.ts",
+    "src/checkpoints/orchestration.ts",
+    "src/components/sessionDetailsPanel.ts",
+    "src/components/sessionsTreeView.ts",
+    "src/extension.ts",
+    "src/test/checkpoints/module.test.ts",
+    "src/test/components/sessionDetailsPanel.test.ts",
+    "src/test/components/sessionsUi.test.ts"
+  ],
+  "agent": "Codex",
+  "model": "gpt-5.4",
+  "turn_id": "2e3768acafc5",
+  "token_usage": {
+    "input_tokens": 12654569,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 12382080,
+    "output_tokens": 71558,
+    "api_call_count": 97
+  },
+  "session_metrics": {
+    "turn_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-13T07:17:55.462541Z",
+    "agent_lines": 423,
+    "agent_removed": 127,
+    "human_added": 0,
+    "human_modified": 22,
+    "human_removed": 77,
+    "total_committed": 445,
+    "total_lines_changed": 649,
+    "agent_percentage": 84.7457627118644,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 1,
+      "user_lines_removed": 2,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "src/checkpoints/models.ts": 1
+      },
+      "user_removed_per_file": {
+        "src/checkpoints/models.ts": 2
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 0,
+      "user_lines_removed": 0,
+      "agent_lines_added": 157,
+      "agent_lines_removed": 151
+    },
+    {
+      "checkpoint_number": 3,
+      "user_lines_added": 7,
+      "user_lines_removed": 82,
+      "agent_lines_added": 239,
+      "agent_lines_removed": 158,
+      "user_added_per_file": {
+        "src/checkpoints/orchestration.ts": 7
+      },
+      "user_removed_per_file": {
+        "src/checkpoints/orchestration.ts": 37,
+        "src/test/checkpoints/module.test.ts": 45
+      }
+    },
+    {
+      "checkpoint_number": 4,
+      "user_lines_added": 16,
+      "user_lines_removed": 16,
+      "agent_lines_added": 390,
+      "agent_lines_removed": 166,
+      "user_added_per_file": {
+        "src/checkpoints/index.ts": 1,
+        "src/components/sessionsTreeView.ts": 2,
+        "src/test/checkpoints/module.test.ts": 13
+      },
+      "user_removed_per_file": {
+        "src/checkpoints/index.ts": 1,
+        "src/components/sessionsTreeView.ts": 2,
+        "src/test/checkpoints/module.test.ts": 13
+      }
+    }
+  ]
+}

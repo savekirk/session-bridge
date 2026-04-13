@@ -21,4 +21,4 @@ Write tests as `*.test.ts` under `src/test/`, mirroring the feature area when po
 Recent history uses short, imperative commit subjects, sometimes with lightweight prefixes such as `feat:` or `refactor:`. Keep each commit focused on one change and describe behavior, not process. Pull requests should summarize the user-visible effect, list verification commands run, link the relevant issue when applicable, and include screenshots or recordings for tree view, panel, or status bar changes.
 
 ## Configuration Notes
-This extension targets VS Code `^1.110.0` and assumes an Entire-enabled Git repository at runtime. For tests and local development, prefer checked-in fixtures and mocks over machine-specific `.entire` state or hard-coded paths.
+This extension targets VS Code `^1.105.0` and assumes an Entire-enabled Git repository at runtime. For tests and local development, prefer checked-in fixtures and mocks over machine-specific `.entire` state or hard-coded paths.

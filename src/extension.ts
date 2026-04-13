@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';
 import { getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';
 import { fetchDefaultCheckpointBranch } from './checkpointBranch';
 import { EntireStatusState, probeEntireWorkspace, resetAutomaticCheckpointFetchAttempt } from './workspaceProbe';
@@ -9,7 +8,20 @@ import { SessionDetailsPanel } from './components/sessionDetailsPanel';
 import { SessionsTreeViewProvider, getSessionDetailTarget, type SessionsViewCommands } from './components/sessionsTreeView';
 import { CheckpointTreeViewProvider, getCheckpointSelectionContext, type CheckpointViewCommands } from './components/checkpointTreeView';
 import { getRawTranscript, getSessionDetail, type SessionCheckpointEntry, type SessionTranscriptTarget } from './checkpoints';
-import { runCommandAsync } from './runCommand';
+import {
+	type EntireCommandContext,
+	showStatus,
+	enableEntire,
+	disableEntire,
+	cleanEntire,
+	resetEntire,
+	showTrace,
+	configureEntire,
+	runDoctor,
+	resumeSession,
+	rewindSession,
+	explainSession,
+} from './entireCommand';
 
 const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';
 const ENTIRE_CONTAINER_ID = 'session-bridge';
@@ -27,7 +39,12 @@ const enum COMMAND_ID {
 	OPEN_SESSION_TRANSCRIPT = "session.bridge.entire.openSessionTranscript",
 	CLEAN = "session.bridge.entire.clean",
 	RESET = "session.bridge.entire.reset",
-	SHOW_TRACE = "session.bridge.entire.showTrace"
+	SHOW_TRACE = "session.bridge.entire.showTrace",
+	CONFIGURE = "session.bridge.entire.configure",
+	DOCTOR = "session.bridge.entire.doctor",
+	RESUME = "session.bridge.entire.resume",
+	REWIND = "session.bridge.entire.rewind",
+	EXPLAIN = "session.bridge.entire.explain",
 }
 
 const TREE_VIEW_IDS = [
@@ -47,7 +64,12 @@ const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',
 	[COMMAND_ID.CLEAN]: 'Clean Entire State',
 	[COMMAND_ID.RESET]: 'Reset Entire Session Data',
-	[COMMAND_ID.SHOW_TRACE]: 'Show Trace'
+	[COMMAND_ID.SHOW_TRACE]: 'Show Trace',
+	[COMMAND_ID.CONFIGURE]: 'Configure Entire',
+	[COMMAND_ID.DOCTOR]: 'Run Entire Doctor',
+	[COMMAND_ID.RESUME]: 'Resume Entire Session',
+	[COMMAND_ID.REWIND]: 'Rewind Entire Session',
+	[COMMAND_ID.EXPLAIN]: 'Explain Entire Session',
 };
 
 
@@ -259,28 +281,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		}
 	};
 
-	const showPlaceholder = async (commandId: COMMAND_ID, message?: string) => {
-		appendCommandRun(commandId);
-		outputChannel.show(true);
-		await vscode.window.showInformationMessage(message ?? `${COMMAND_TITLES[commandId]} is not implemented yet.`);
-	};
-
-	const showStatus = async () => {
-		appendCommandRun(COMMAND_ID.SHOW_STATUS);
-		outputChannel.show(true);
-		try {
-			const resolved = await resolveEntireBinary();
-			if (isEntireBinary(resolved)) {
-				await vscode.window.showInformationMessage(resolved.raw);
-			} else {
-				await vscode.window.showErrorMessage(resolved.message);
-			}
-		} catch (error) {
-			console.error(error);
-			await vscode.window.showErrorMessage("Error getting status of entire cli. Make sure the cli is installed and try again");
-		}
-	};
-
 	const refreshWorkspaceProbe = async (reason: string) => {
 		const cwd = await resolveProbeTargetPath();
 		if (reason === 'manual refresh' && cwd) {
@@ -407,6 +407,92 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		await vscode.window.showTextDocument(document, { preview: false });
 	};
 
+	/** Shared context passed to CLI command handlers in EntireCommand. */
+	const commandContext: EntireCommandContext = {
+		resolveRepoPath: resolveProbeTargetPath,
+	};
+
+	const showPlaceholder = async (commandId: COMMAND_ID, message?: string) => {
+		appendCommandRun(commandId);
+		outputChannel.show(true);
+		await vscode.window.showInformationMessage(message ?? `${COMMAND_TITLES[commandId]} is not implemented yet.`);
+	};
+
+	for (const commandId of Object.keys(COMMAND_TITLES) as COMMAND_ID[]) {
+		const disposable = vscode.commands.registerCommand(commandId, async (...args: unknown[]) => {
+			appendCommandRun(commandId);
+			switch (commandId) {
+				case COMMAND_ID.REFRESH:
+					outputChannel.appendLine(`[command] REFRESH: starting workspace probe`);
+					await refreshWorkspaceProbe('manual refresh');
+					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint sessions reload`);
+					checkpointSessionsProvider.reload();
+					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
+					checkpointProvider.reload();
+					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
+					return;
+				case COMMAND_ID.FETCH_CHECKPOINT_BRANCH:
+					await fetchCheckpointBranch();
+					return;
+				case COMMAND_ID.BROWSE_CHECKPOINTS:
+					outputChannel.appendLine(`[command] BROWSE_CHECKPOINTS: triggering checkpoint reload and focusing view`);
+					checkpointProvider.reload();
+					await vscode.commands.executeCommand(`${CHECKPOINTS_VIEW_ID}.focus`);
+					return;
+				case COMMAND_ID.OPEN_COMMIT_CHANGES: {
+					const target = normalizeCommitChangesTarget(args[0]);
+					await openCommitChanges(target);
+					return;
+				}
+				case COMMAND_ID.OPEN_SESSION_TRANSCRIPT: {
+					const target = normalizeSessionTranscriptTarget(args[0]);
+					await openSessionTranscript(target);
+					return;
+				}
+				case COMMAND_ID.SHOW_STATUS:
+					await showStatus(commandContext);
+					break;
+				case COMMAND_ID.FOCUS_VIEW:
+					await vscode.commands.executeCommand('workbench.view.extension.session-bridge');
+					break;
+				case COMMAND_ID.ENABLE:
+					await enableEntire(commandContext);
+					break;
+				case COMMAND_ID.DISABLE:
+					await disableEntire(commandContext);
+					break;
+				case COMMAND_ID.CLEAN:
+					await cleanEntire(commandContext);
+					break;
+				case COMMAND_ID.RESET:
+					await resetEntire(commandContext);
+					break;
+				case COMMAND_ID.SHOW_TRACE:
+					await showTrace(commandContext);
+					break;
+				case COMMAND_ID.CONFIGURE:
+					await configureEntire(commandContext);
+					break;
+				case COMMAND_ID.DOCTOR:
+					await runDoctor(commandContext);
+					break;
+				case COMMAND_ID.RESUME:
+					await resumeSession(commandContext);
+					break;
+				case COMMAND_ID.REWIND:
+					await rewindSession(commandContext);
+					break;
+				case COMMAND_ID.EXPLAIN:
+					await explainSession(commandContext);
+					break;
+				default:
+					await showPlaceholder(commandId);
+			}
+		});
+
+		context.subscriptions.push(disposable);
+	}
+
 	await updateProbeWatchers(await resolveProbeTargetPath());
 	context.subscriptions.push({
 		dispose: () => {
@@ -433,55 +519,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 		await refreshWorkspaceProbe('file opened');
 	}));
-
-	for (const commandId of Object.keys(COMMAND_TITLES) as COMMAND_ID[]) {
-		const disposable = vscode.commands.registerCommand(commandId, async (...args: unknown[]) => {
-			switch (commandId) {
-				case COMMAND_ID.REFRESH:
-					appendCommandRun(commandId);
-					outputChannel.appendLine(`[command] REFRESH: starting workspace probe`);
-					await refreshWorkspaceProbe('manual refresh');
-					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint sessions reload`);
-					checkpointSessionsProvider.reload();
-					outputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);
-					checkpointProvider.reload();
-					await vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');
-					return;
-				case COMMAND_ID.FETCH_CHECKPOINT_BRANCH:
-					await fetchCheckpointBranch();
-					return;
-				case COMMAND_ID.BROWSE_CHECKPOINTS:
-					appendCommandRun(commandId);
-					outputChannel.appendLine(`[command] BROWSE_CHECKPOINTS: triggering checkpoint reload and focusing view`);
-					checkpointProvider.reload();
-					await vscode.commands.executeCommand(`${CHECKPOINTS_VIEW_ID}.focus`);
-					return;
-				case COMMAND_ID.OPEN_COMMIT_CHANGES: {
-					const target = normalizeCommitChangesTarget(args[0]);
-					await openCommitChanges(target);
-					return;
-				}
-				case COMMAND_ID.OPEN_SESSION_TRANSCRIPT: {
-					const target = normalizeSessionTranscriptTarget(args[0]);
-					await openSessionTranscript(target);
-					return;
-				}
-				case COMMAND_ID.SHOW_STATUS: {
-					await showStatus();
-					break;
-				}
-				case COMMAND_ID.FOCUS_VIEW: {
-					appendCommandRun(commandId);
-					await vscode.commands.executeCommand('workbench.view.extension.session-bridge');
-					break;
-				}
-				default:
-					await showPlaceholder(commandId);
-			}
-		});
-
-		context.subscriptions.push(disposable);
-	}
 
 	outputChannel.appendLine(`[activate] Registered Entire container: ${ENTIRE_CONTAINER_ID}`);
 	outputChannel.appendLine(`[activate] Registered views: ${TREE_VIEW_IDS.join(', ')}`);

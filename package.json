@@ -1,10 +1,10 @@
 {
   "name": "session-bridge",
   "displayName": "Session Bridge",
-  "description": "Unofficial VSCode extension for inspecting and managing [Entire](https://docs.entire.io) sessions and checkpoints",
+  "description": "Unofficial VSCode extension for inspecting and managing Entire sessions and checkpoints",
   "version": "0.0.1",
   "publisher": "kirk-agbenyegah",
-  "repository": "https://github.com/savekirk/session-bridge/", 
+  "repository": "https://github.com/savekirk/session-bridge",
   "engines": {
     "vscode": "^1.105.0"
   },
@@ -58,7 +58,7 @@
       {
         "view": "session.bridge.entire.checkpoints",
         "when": "gitOpenRepositoryCount != 0 && session.bridge.state.disabled",
-        "contents": "Entire is not enabled for this repository.\nTo learn more about Entire [read the docs](https://docs.entire.io)"
+        "contents": "Entire is not enabled for this repository.\n[Enable In Repository](command:session.bridge.entire.enable)\nTo learn more about Entire [read the docs](https://docs.entire.io)"
       },
       {
         "view": "session.bridge.entire.sessions",
@@ -130,6 +130,31 @@
       {
         "command": "session.bridge.entire.showTrace",
         "title": "Show Trace",
+        "category": "Session Bridge (Entire)"
+      },
+      {
+        "command": "session.bridge.entire.configure",
+        "title": "Configure Entire",
+        "category": "Session Bridge (Entire)"
+      },
+      {
+        "command": "session.bridge.entire.doctor",
+        "title": "Run Doctor",
+        "category": "Session Bridge (Entire)"
+      },
+      {
+        "command": "session.bridge.entire.resume",
+        "title": "Resume Session",
+        "category": "Session Bridge (Entire)"
+      },
+      {
+        "command": "session.bridge.entire.rewind",
+        "title": "Rewind Session",
+        "category": "Session Bridge (Entire)"
+      },
+      {
+        "command": "session.bridge.entire.explain",
+        "title": "Explain Session",
         "category": "Session Bridge (Entire)"
       }
     ],

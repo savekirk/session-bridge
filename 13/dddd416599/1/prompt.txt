@@ -1,0 +1,5 @@
+Clicking on Session Bridge plugin status in the status bar should open the plugin view instead of showing the CLI status
+
+---
+
+Clicking on Session Bridge plugin status in the status bar should open the plugin view instead of showing the CLI status

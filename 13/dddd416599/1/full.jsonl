@@ -1,0 +1,1315 @@
+{
+  "info": {
+    "id": "ses_277ed760bffeXZM4Joly2lQJzU",
+    "slug": "nimble-cabin",
+    "projectID": "3ad407f6a7c5123f405fb21a3759114ca4c01364",
+    "directory": "/Users/savekirk/dev/ai/entire/session-bridge",
+    "title": "Session Bridge status bar click behavior modification",
+    "version": "1.4.3",
+    "summary": {
+      "additions": 10,
+      "deletions": 3,
+      "files": 2
+    },
+    "time": {
+      "created": 1776104409588,
+      "updated": 1776104556405
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1776104409613
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "google",
+          "modelID": "gemini-3.1-pro-preview",
+          "variant": "medium"
+        },
+        "summary": {
+          "diffs": []
+        },
+        "id": "msg_d881289fb00186SVbli64I0l7T",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Clicking on Session Bridge plugin status in the status bar should open the plugin view instead of showing the CLI status ",
+          "id": "prt_d881289fb002v6AiFtbel3w1bz",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881289fb00186SVbli64I0l7T"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881289fb00186SVbli64I0l7T",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "input": 0,
+          "output": 0,
+          "reasoning": 0,
+          "cache": {
+            "read": 0,
+            "write": 0
+          }
+        },
+        "modelID": "gemini-3.1-pro-preview",
+        "providerID": "google",
+        "time": {
+          "created": 1776104409629,
+          "completed": 1776104430939
+        },
+        "id": "msg_d88128a1d0017vjd4X46w2dsNp",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": []
+    },
+    {
+      "info": {
+        "role": "user",
+        "time": {
+          "created": 1776104452297
+        },
+        "agent": "build",
+        "model": {
+          "providerID": "github-copilot",
+          "modelID": "claude-sonnet-4.5",
+          "variant": "medium"
+        },
+        "summary": {
+          "diffs": [
+            {
+              "file": "src/components/entireStatusBarItem.ts",
+              "patch": "Index: src/components/entireStatusBarItem.ts\n===================================================================\n--- src/components/entireStatusBarItem.ts\t\n+++ src/components/entireStatusBarItem.ts\t\n@@ -1,181 +1,181 @@\n import * as vscode from \"vscode\";\n import { EntireStatusState, EntireWorkspaceState } from \"../workspaceProbe\";\n \n interface StatusBarInfo {\n   iconName: string;\n   title: string;\n   description: string;\n   backgroundColor?: vscode.ThemeColor;\n }\n \n const WARNING_BACKGROUND = new vscode.ThemeColor(\"statusBarItem.warningBackground\");\n \n const statusInfoMap: Record<EntireStatusState, StatusBarInfo> = {\n   [EntireStatusState.ENABLED]: {\n     iconName: \"git-compare\",\n     title: \"Enabled\",\n     description: \"Entire is enabled for this repository.\",\n   },\n   [EntireStatusState.CLI_MISSING]: {\n     iconName: \"warning\",\n     title: \"Not Found\",\n     description: \"The Entire CLI is not available in the extension host environment.\",\n     backgroundColor: WARNING_BACKGROUND,\n   },\n   [EntireStatusState.NOT_GIT_REPO]: {\n     iconName: \"repo\",\n     title: \"Not a git repo\",\n     description: \"Open a Git repository to use Entire features.\",\n   },\n   [EntireStatusState.DISABLED]: {\n     iconName: \"circle-slash\",\n     title: \"Not Enabled\",\n     description: \"Entire is not enabled for this repository.\",\n   },\n };\n \n function getStatusBarInfo(workspaceState: EntireWorkspaceState): StatusBarInfo {\n \tif (workspaceState.state !== EntireStatusState.ENABLED) {\n \t\treturn statusInfoMap[workspaceState.state];\n \t}\n \n \tconst sessionCount = workspaceState.activeSessions.length;\n \tif (sessionCount > 1) {\n \t\tconst activeCount = workspaceState.activeSessions.filter((session) => session.status === \"ACTIVE\").length;\n \t\treturn {\n \t\t\ticonName: \"layers\",\n \t\t\ttitle: `${sessionCount} Sessions`,\n \t\t\tdescription: activeCount > 0\n \t\t\t\t? `Multiple Entire sessions are live in this workspace (${activeCount} active).`\n \t\t\t\t: \"Multiple Entire sessions are live in this workspace.\",\n \t\t};\n \t}\n \n \tif (sessionCount === 1) {\n \t\tconst session = workspaceState.activeSessions[0];\n \t\tconst agent = formatAgentName(session.agent);\n \t\tconst stateLabel = session.status === \"ACTIVE\" ? \"Active\" : \"Idle\";\n \n \t\treturn {\n \t\t\ticonName: session.status === \"ACTIVE\" ? \"pulse\" : \"clock\",\n \t\t\ttitle: agent ? `${stateLabel} · ${agent}` : stateLabel,\n \t\t\tdescription: session.status === \"ACTIVE\"\n \t\t\t\t? \"Entire is actively tracking a session in this workspace.\"\n \t\t\t\t: \"Entire is tracking an idle live session in this workspace.\",\n \t\t};\n \t}\n \n   return statusInfoMap[EntireStatusState.ENABLED];\n }\n \n function buildTooltip(statusInfo: StatusBarInfo, workspaceState: EntireWorkspaceState): vscode.MarkdownString {\n   const tooltip = new vscode.MarkdownString(undefined, true);\n   tooltip.isTrusted = false;\n   tooltip.supportThemeIcons = true;\n \n   tooltip.appendMarkdown(`**Entire**\\n\\n`);\n   tooltip.appendMarkdown(\"**Status:** \");\n   tooltip.appendText(statusInfo.title);\n   tooltip.appendText(\"\\n\");\n   tooltip.appendText(statusInfo.description);\n \n   if (workspaceState.binary?.cliVersion) {\n     tooltip.appendMarkdown(\"\\n**CLI Version:** \");\n     tooltip.appendText(workspaceState.binary.cliVersion);\n   }\n \n   const sessionCount = workspaceState.activeSessions.length;\n   tooltip.appendMarkdown(\"\\n\\n**Sessions:** \");\n   tooltip.appendText(String(sessionCount));\n \n   if (sessionCount > 0) {\n     for (const session of workspaceState.activeSessions.slice(0, 3)) {\n       tooltip.appendMarkdown(\"\\n- \");\n       tooltip.appendText(describeSession(session));\n     }\n \n     if (sessionCount > 3) {\n       tooltip.appendMarkdown(\"\\n- \");\n       tooltip.appendText(`${sessionCount - 3} more session(s)`);\n     }\n   }\n \n   if (workspaceState.settings?.settingsPaths.length) {\n     tooltip.appendMarkdown(\"\\n\\n**Settings Files:** \");\n     tooltip.appendText(String(workspaceState.settings.settingsPaths.length));\n   }\n \n   if (workspaceState.warnings.length > 0) {\n     tooltip.appendMarkdown(\"\\n\\n**Warnings**\");\n     for (const warning of workspaceState.warnings) {\n       tooltip.appendMarkdown(\"\\n- \");\n       tooltip.appendText(warning);\n     }\n   }\n \n-  tooltip.appendMarkdown(\"\\n\\n_Click to show Entire status._\");\n+  tooltip.appendMarkdown(\"\\n\\n_Click to open Session Bridge view._\");\n \n   return tooltip;\n }\n \n function describeSession(session: EntireWorkspaceState[\"activeSessions\"][number]): string {\n \tconst parts: string[] = [];\n \tconst agent = formatAgentName(session.agent);\n \n \tif (agent) {\n \t\tparts.push(agent);\n \t}\n \tif (session.model) {\n \t\tparts.push(session.model);\n \t}\n \tif (session.status) {\n \t\tparts.push(session.status);\n \t}\n \tif (session.sessionId) {\n \t\tparts.push(`#${session.sessionId.slice(0, 8)}`);\n \t}\n \n   return parts.join(\" · \");\n }\n \n function formatAgentName(agentType?: string): string | undefined {\n   if (!agentType) {\n     return undefined;\n   }\n \n   return agentType\n     .split(/[-_]/g)\n     .filter(Boolean)\n     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))\n     .join(\" \");\n }\n \n export function createStatusBarItem(command: string, workspaceState: EntireWorkspaceState): vscode.StatusBarItem {\n   const statusBarItem = vscode.window.createStatusBarItem(\n     \"session.bridge.entire.status\",\n     vscode.StatusBarAlignment.Left,\n     100,\n   );\n   updateStatusBarItem(statusBarItem, command, workspaceState);\n \n   return statusBarItem;\n }\n \n export function updateStatusBarItem(\n   statusBarItem: vscode.StatusBarItem,\n   command: string,\n   workspaceState: EntireWorkspaceState,\n ): void {\n   const statusInfo = getStatusBarInfo(workspaceState);\n   const label = `Session Bridge (Entire): ${statusInfo.title}`;\n \n   statusBarItem.name = \"Session Bridge Status\";\n   statusBarItem.text = `$(${statusInfo.iconName}) ${label}`;\n   statusBarItem.tooltip = buildTooltip(statusInfo, workspaceState);\n   statusBarItem.command = command;\n   statusBarItem.backgroundColor = statusInfo.backgroundColor;\n   statusBarItem.accessibilityInformation = {\n     label,\n     role: \"button\",\n   };\n }\n",
+              "additions": 1,
+              "deletions": 1,
+              "status": "modified"
+            },
+            {
+              "file": "src/extension.ts",
+              "patch": "Index: src/extension.ts\n===================================================================\n--- src/extension.ts\t\n+++ src/extension.ts\t\n@@ -1,609 +1,616 @@\n import * as vscode from 'vscode';\n import * as path from 'path';\n import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';\n import { getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';\n import { fetchDefaultCheckpointBranch } from './checkpointBranch';\n import { EntireStatusState, probeEntireWorkspace, resetAutomaticCheckpointFetchAttempt } from './workspaceProbe';\n import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';\n import { SessionDetailsPanel } from './components/sessionDetailsPanel';\n import { SessionsTreeViewProvider, getSessionDetailTarget, type SessionsViewCommands } from './components/sessionsTreeView';\n import { CheckpointTreeViewProvider, getCheckpointSelectionContext, type CheckpointViewCommands } from './components/checkpointTreeView';\n import { getRawTranscript, getSessionDetail, type SessionCheckpointEntry, type SessionTranscriptTarget } from './checkpoints';\n import { runCommandAsync } from './runCommand';\n \n const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';\n const ENTIRE_CONTAINER_ID = 'session-bridge';\n const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';\n const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';\n const enum COMMAND_ID {\n \tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n+\tFOCUS_VIEW = \"session.bridge.entire.focusView\",\n \tENABLE = \"session.bridge.entire.enable\",\n \tDISABLE = \"session.bridge.entire.disable\",\n \tREFRESH = \"session.bridge.entire.refresh\",\n \tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n \tBROWSE_CHECKPOINTS = \"session.bridge.entire.browseCheckpoints\",\n \tOPEN_COMMIT_CHANGES = \"session.bridge.entire.openCommitChanges\",\n \tOPEN_SESSION_TRANSCRIPT = \"session.bridge.entire.openSessionTranscript\",\n \tCLEAN = \"session.bridge.entire.clean\",\n \tRESET = \"session.bridge.entire.reset\",\n \tSHOW_TRACE = \"session.bridge.entire.showTrace\"\n }\n \n const TREE_VIEW_IDS = [\n \tSESSIONS_VIEW_ID,\n \tCHECKPOINTS_VIEW_ID,\n ] as const;\n \n const COMMAND_TITLES: Record<COMMAND_ID, string> = {\n \t[COMMAND_ID.SHOW_STATUS]: 'Show Status',\n+\t[COMMAND_ID.FOCUS_VIEW]: 'Focus View',\n \t[COMMAND_ID.ENABLE]: 'Enable In Repository',\n \t[COMMAND_ID.DISABLE]: 'Disable In Repository',\n \t[COMMAND_ID.REFRESH]: 'Refresh',\n \t[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',\n \t[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',\n \t[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',\n \t[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',\n \t[COMMAND_ID.CLEAN]: 'Clean Entire State',\n \t[COMMAND_ID.RESET]: 'Reset Entire Session Data',\n \t[COMMAND_ID.SHOW_TRACE]: 'Show Trace'\n };\n \n \n const WORKSPACE_CONTEXT: [EntireStatusState, string][] = [\n \t[EntireStatusState.CLI_MISSING, 'session.bridge.state.cli-missing'],\n \t[EntireStatusState.DISABLED, 'session.bridge.state.disabled'],\n \t[EntireStatusState.ENABLED, 'session.bridge.state.enabled'],\n \t[EntireStatusState.NOT_GIT_REPO, 'session.bridge.state.not-git-repo']\n ];\n \n interface GitApi {\n \tgetRepository(uri: vscode.Uri): GitRepository | null;\n \topenRepository(uri: vscode.Uri): Promise<GitRepository | null>;\n }\n \n interface GitRepository {\n \treadonly rootUri: vscode.Uri;\n }\n \n interface GitExtension {\n \tgetAPI(version: 1): GitApi;\n }\n \n interface CommitChangesTarget {\n \tcommitSha?: string;\n \trepoPath?: string;\n }\n \n const setWorkspaceContext = async (\n \tworkspaceState: EntireStatusState,\n ) => {\n \tfor (const context of WORKSPACE_CONTEXT) {\n \t\tconst status = context[0] === workspaceState;\n \t\tconst key = context[1];\n \t\tawait vscode.commands.executeCommand('setContext', key, status);\n \t}\n };\n \n export async function activate(context: vscode.ExtensionContext): Promise<void> {\n \tconst outputChannel = vscode.window.createOutputChannel(ENTIRE_OUTPUT_CHANNEL);\n \tcontext.subscriptions.push(outputChannel);\n \n \tconst initialProbeTarget = await resolveProbeTargetPath();\n \tlet workspaceState = await probeEntireWorkspace(initialProbeTarget);\n \tawait setWorkspaceContext(workspaceState.state);\n-\tconst statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);\n+\tconst statusBarItem = createStatusBarItem(COMMAND_ID.FOCUS_VIEW, workspaceState);\n \tif (vscode.workspace.workspaceFolders?.length) {\n \t\tstatusBarItem.show();\n \t\tcontext.subscriptions.push(statusBarItem);\n \t}\n \n \tconst checkpointCommands = {\n \t\trefresh: COMMAND_ID.REFRESH,\n \t\topenCommitChanges: COMMAND_ID.OPEN_COMMIT_CHANGES,\n \t} satisfies CheckpointViewCommands;\n \n \tconst checkpointProvider = new CheckpointTreeViewProvider(\n \t\tworkspaceState,\n \t\tinitialProbeTarget,\n \t\tcheckpointCommands,\n \t\toutputChannel,\n \t);\n \tconst sessionCommands = {\n \t\trefresh: COMMAND_ID.REFRESH,\n \t\tshowStatus: COMMAND_ID.SHOW_STATUS,\n \t\topenSessionTranscript: COMMAND_ID.OPEN_SESSION_TRANSCRIPT,\n \t} satisfies SessionsViewCommands;\n \tconst checkpointSessionsProvider = new SessionsTreeViewProvider(\n \t\tworkspaceState,\n \t\tinitialProbeTarget,\n \t\tsessionCommands,\n \t\toutputChannel,\n \t);\n \tconst sessionDetailsPanel = new SessionDetailsPanel(outputChannel);\n \tcontext.subscriptions.push(sessionDetailsPanel);\n \n \tconst checkpointSessionsTreeView = vscode.window.createTreeView(SESSIONS_VIEW_ID, {\n \t\ttreeDataProvider: checkpointSessionsProvider,\n \t\tshowCollapseAll: true,\n \t});\n \tcontext.subscriptions.push(checkpointSessionsTreeView);\n \tconst checkpointTreeView = vscode.window.createTreeView(CHECKPOINTS_VIEW_ID, {\n \t\ttreeDataProvider: checkpointProvider,\n \t\tshowCollapseAll: true,\n \t});\n \tcontext.subscriptions.push(checkpointTreeView);\n \tcontext.subscriptions.push(checkpointTreeView.onDidChangeSelection((event) => {\n \t\tconst selection = getCheckpointSelectionContext(event.selection[0]);\n \t\toutputChannel.appendLine(\n \t\t\t`[checkpoint-selection] checkpointId=${selection?.checkpointId ?? \"(none)\"}, sessionPaths=${selection?.sessionPaths.length ?? 0}`,\n \t\t);\n \t\tcheckpointSessionsProvider.setCheckpointSelection(selection);\n \t}));\n \n \tlet sessionDetailLoadGeneration = 0;\n \tconst showSelectedSessionDetail = async (selection: vscode.TreeItem | undefined) => {\n \t\tconst target = getSessionDetailTarget(selection);\n \t\tif (!target) {\n \t\t\treturn;\n \t\t}\n \n \t\tconst repoPath = await resolveProbeTargetPath();\n \t\tif (!repoPath) {\n \t\t\tsessionDetailsPanel.showError(\"Open a repository folder to inspect session details.\");\n \t\t\treturn;\n \t\t}\n \n \t\tconst generation = ++sessionDetailLoadGeneration;\n \t\tsessionDetailsPanel.showLoading(target);\n \n \t\ttry {\n \t\t\tconst detail = await getSessionDetail(repoPath, target);\n \t\t\tif (generation !== sessionDetailLoadGeneration) {\n \t\t\t\treturn;\n \t\t\t}\n \n \t\t\tif (!detail) {\n \t\t\t\tsessionDetailsPanel.showError(\"Session details are no longer available for the selected item.\");\n \t\t\t\treturn;\n \t\t\t}\n \n \t\t\tsessionDetailsPanel.showDetail(detail);\n \t\t} catch (error) {\n \t\t\tconst message = error instanceof Error ? error.message : \"Failed to load session details\";\n \t\t\toutputChannel.appendLine(`[session-details] load error: ${message}`);\n \t\t\tif (generation !== sessionDetailLoadGeneration) {\n \t\t\t\treturn;\n \t\t\t}\n \n \t\t\tsessionDetailsPanel.showError(message);\n \t\t}\n \t};\n \tcontext.subscriptions.push(checkpointSessionsTreeView.onDidChangeSelection((event) => {\n \t\tvoid showSelectedSessionDetail(event.selection[0]);\n \t}));\n \n \tconst appendCommandRun = (commandId: COMMAND_ID) => {\n \t\toutputChannel.appendLine(`[command] ${COMMAND_TITLES[commandId] ?? commandId}`);\n \t};\n \n \tlet probeWatchers: vscode.Disposable[] = [];\n \tlet watchedRepoPath: string | undefined;\n \tlet pendingProbeRefresh: NodeJS.Timeout | undefined;\n \n \tconst disposeProbeWatchers = () => {\n \t\tfor (const disposable of probeWatchers) {\n \t\t\tdisposable.dispose();\n \t\t}\n \t\tprobeWatchers = [];\n \t\twatchedRepoPath = undefined;\n \t};\n \n \tconst scheduleProbeRefresh = (reason: string) => {\n \t\tif (pendingProbeRefresh) {\n \t\t\tclearTimeout(pendingProbeRefresh);\n \t\t}\n \n \t\tpendingProbeRefresh = setTimeout(() => {\n \t\t\tpendingProbeRefresh = undefined;\n \t\t\tvoid refreshWorkspaceProbe(reason);\n \t\t}, 150);\n \t};\n \n \n \tconst addProbeWatcher = (watcher: vscode.FileSystemWatcher, reason: string) => {\n \t\tprobeWatchers.push(\n \t\t\twatcher,\n \t\t\twatcher.onDidCreate(() => scheduleProbeRefresh(reason)),\n \t\t\twatcher.onDidChange(() => scheduleProbeRefresh(reason)),\n \t\t\twatcher.onDidDelete(() => scheduleProbeRefresh(reason)),\n \t\t);\n \t};\n \n \tconst updateProbeWatchers = async (repoPath: string | undefined) => {\n \t\tif (!repoPath) {\n \t\t\tdisposeProbeWatchers();\n \t\t\treturn;\n \t\t}\n \n \t\tif (watchedRepoPath === repoPath && probeWatchers.length > 0) {\n \t\t\treturn;\n \t\t}\n \n \t\tdisposeProbeWatchers();\n \t\twatchedRepoPath = repoPath;\n \n \t\taddProbeWatcher(\n \t\t\tvscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(repoPath, '.entire/settings*.json')),\n \t\t\t'entire settings changed',\n \t\t);\n \n \t\tconst headRelativePath = (await tryExecGit(repoPath, ['rev-parse', '--git-path', 'HEAD']))?.trim();\n \t\tif (headRelativePath) {\n \t\t\tconst headAbsolutePath = path.resolve(repoPath, headRelativePath);\n \t\t\taddProbeWatcher(\n \t\t\t\tvscode.workspace.createFileSystemWatcher(\n \t\t\t\t\tnew vscode.RelativePattern(path.dirname(headAbsolutePath), path.basename(headAbsolutePath)),\n \t\t\t\t),\n \t\t\t\t'git HEAD changed',\n \t\t\t);\n \t\t}\n \n \t\tconst gitCommonDir = await getGitCommonDir(repoPath);\n \t\tif (gitCommonDir) {\n \t\t\taddProbeWatcher(\n \t\t\t\tvscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(gitCommonDir, 'entire-sessions/*.json')),\n \t\t\t\t'live session state changed',\n \t\t\t);\n \t\t}\n \t};\n \n \tconst showPlaceholder = async (commandId: COMMAND_ID, message?: string) => {\n \t\tappendCommandRun(commandId);\n \t\toutputChannel.show(true);\n \t\tawait vscode.window.showInformationMessage(message ?? `${COMMAND_TITLES[commandId]} is not implemented yet.`);\n \t};\n \n \tconst showStatus = async () => {\n \t\tappendCommandRun(COMMAND_ID.SHOW_STATUS);\n \t\toutputChannel.show(true);\n \t\ttry {\n \t\t\tconst resolved = await resolveEntireBinary();\n \t\t\tif (isEntireBinary(resolved)) {\n \t\t\t\tawait vscode.window.showInformationMessage(resolved.raw);\n \t\t\t} else {\n \t\t\t\tawait vscode.window.showErrorMessage(resolved.message);\n \t\t\t}\n \t\t} catch (error) {\n \t\t\tconsole.error(error);\n \t\t\tawait vscode.window.showErrorMessage(\"Error getting status of entire cli. Make sure the cli is installed and try again\");\n \t\t}\n \t};\n \n \tconst refreshWorkspaceProbe = async (reason: string) => {\n \t\tconst cwd = await resolveProbeTargetPath();\n \t\tif (reason === 'manual refresh' && cwd) {\n \t\t\tresetAutomaticCheckpointFetchAttempt(cwd);\n \t\t}\n \t\tworkspaceState = await probeEntireWorkspace(cwd);\n \t\tawait setWorkspaceContext(workspaceState.state);\n \t\tawait updateProbeWatchers(cwd);\n-\t\tupdateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);\n+\t\tupdateStatusBarItem(statusBarItem, COMMAND_ID.FOCUS_VIEW, workspaceState);\n \t\tcheckpointSessionsProvider.setWorkspaceState(workspaceState, cwd);\n \t\tcheckpointSessionsProvider.refresh();\n \t\tcheckpointProvider.setWorkspaceState(workspaceState, cwd);\n \t\tcheckpointProvider.refresh();\n \n \t\tif (cwd) {\n \t\t\toutputChannel.appendLine(`[probe] ${reason}: ${cwd}`);\n \t\t\treturn;\n \t\t}\n \n \t\toutputChannel.appendLine(`[probe] ${reason}: no file-backed workspace target`);\n \t};\n \n \tconst fetchCheckpointBranch = async () => {\n \t\tappendCommandRun(COMMAND_ID.FETCH_CHECKPOINT_BRANCH);\n \t\toutputChannel.show(true);\n \n \t\tconst repoPath = await resolveProbeTargetPath();\n \t\tif (!repoPath) {\n \t\t\tawait vscode.window.showWarningMessage(\"Open a repository folder to fetch Entire checkpoint metadata.\");\n \t\t\treturn;\n \t\t}\n \n \t\tconst fetchResult = await fetchDefaultCheckpointBranch(repoPath);\n \t\tif (fetchResult.reason === \"no-remote\") {\n \t\t\tawait vscode.window.showWarningMessage(\"No Git remote is configured for this repository.\");\n \t\t\treturn;\n \t\t}\n \n \t\tconst remoteName = fetchResult.remoteName ?? \"unknown remote\";\n \t\toutputChannel.appendLine(`[fetch] Attempting ${METADATA_BRANCH_NAME} from ${remoteName}`);\n \n \t\tif (!fetchResult.fetched) {\n \t\t\tconst details = fetchResult.details ?? \"unknown fetch failure\";\n \t\t\toutputChannel.appendLine(`[fetch] Failed: ${details}`);\n \t\t\tawait vscode.window.showWarningMessage(\n \t\t\t\t`Could not fetch ${METADATA_BRANCH_NAME} from ${remoteName}. ${details}`,\n \t\t\t);\n \t\t\treturn;\n \t\t}\n \n \t\toutputChannel.appendLine(`[fetch] Fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);\n \t\tawait refreshWorkspaceProbe(`fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);\n \t\tcheckpointSessionsProvider.reload();\n \t\tcheckpointProvider.reload();\n \t\tawait vscode.window.showInformationMessage(`Fetched ${METADATA_BRANCH_NAME} from ${remoteName}.`);\n \t};\n \n \tconst openCommitChanges = async (target: CommitChangesTarget) => {\n \t\tappendCommandRun(COMMAND_ID.OPEN_COMMIT_CHANGES);\n \t\tif (!target.commitSha) {\n \t\t\tawait vscode.window.showWarningMessage(\"Checkpoint changes could not be opened.\");\n \t\t\treturn;\n \t\t}\n \n \t\tconst repoPath = target.repoPath ?? await resolveProbeTargetPath();\n \t\tif (!repoPath) {\n \t\t\tawait vscode.window.showWarningMessage(\"Open a repository folder to inspect commit changes.\");\n \t\t\treturn;\n \t\t}\n \n \t\tconst gitApi = await getBuiltInGitApi();\n \t\tif (!gitApi) {\n \t\t\tawait vscode.window.showWarningMessage(\"VS Code Git integration is not available.\");\n \t\t\treturn;\n \t\t}\n \n \t\tlet repository = gitApi.getRepository(vscode.Uri.file(repoPath));\n \t\tif (!repository) {\n \t\t\trepository = await gitApi.openRepository(vscode.Uri.file(repoPath));\n \t\t}\n \n \t\tif (!repository) {\n \t\t\tawait vscode.window.showWarningMessage(\"The repository is not available in VS Code Git.\");\n \t\t\treturn;\n \t\t}\n \n \t\tawait vscode.commands.executeCommand('git.viewCommit', repository, target.commitSha);\n \t};\n \n \tconst openSessionTranscript = async (target: SessionTranscriptTarget | undefined) => {\n \t\tappendCommandRun(COMMAND_ID.OPEN_SESSION_TRANSCRIPT);\n \t\tif (!target) {\n \t\t\tawait vscode.window.showWarningMessage(\"Session transcript could not be opened.\");\n \t\t\treturn;\n \t\t}\n \n \t\tif (target.transcriptPath) {\n \t\t\ttry {\n \t\t\t\tawait vscode.commands.executeCommand(\"vscode.open\", vscode.Uri.file(target.transcriptPath));\n \t\t\t\treturn;\n \t\t\t} catch (error) {\n \t\t\t\tconst message = error instanceof Error ? error.message : String(error);\n \t\t\t\toutputChannel.appendLine(`[session-transcript] failed to open ${target.transcriptPath}: ${message}`);\n \t\t\t}\n \t\t}\n \n \t\tlet transcript = selectTranscriptFromTarget(target);\n \t\tif (!transcript) {\n \t\t\tconst repoPath = await resolveProbeTargetPath();\n \t\t\tif (repoPath) {\n \t\t\t\ttranscript = await getRawTranscript(repoPath, target.checkpoint.checkpointId, target.sessionId);\n \t\t\t}\n \t\t}\n \n \t\tif (!transcript) {\n \t\t\tawait vscode.window.showWarningMessage(\"No transcript is available for the selected session.\");\n \t\t\treturn;\n \t\t}\n \n \t\tconst document = await vscode.workspace.openTextDocument({\n \t\t\tlanguage: \"plaintext\",\n \t\t\tcontent: transcript,\n \t\t});\n \t\tawait vscode.window.showTextDocument(document, { preview: false });\n \t};\n \n \tawait updateProbeWatchers(await resolveProbeTargetPath());\n \tcontext.subscriptions.push({\n \t\tdispose: () => {\n \t\t\tif (pendingProbeRefresh) {\n \t\t\t\tclearTimeout(pendingProbeRefresh);\n \t\t\t\tpendingProbeRefresh = undefined;\n \t\t\t}\n \t\t\tdisposeProbeWatchers();\n \t\t},\n \t});\n \n \tcontext.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(async (editor) => {\n \t\tif (!isFileBackedEditor(editor)) {\n \t\t\treturn;\n \t\t}\n \n \t\tawait refreshWorkspaceProbe('active editor changed');\n \t}));\n \n \tcontext.subscriptions.push(vscode.workspace.onDidOpenTextDocument(async (document) => {\n \t\tif (document.uri.scheme !== 'file') {\n \t\t\treturn;\n \t\t}\n \n \t\tawait refreshWorkspaceProbe('file opened');\n \t}));\n \n \tfor (const commandId of Object.keys(COMMAND_TITLES) as COMMAND_ID[]) {\n \t\tconst disposable = vscode.commands.registerCommand(commandId, async (...args: unknown[]) => {\n \t\t\tswitch (commandId) {\n \t\t\t\tcase COMMAND_ID.REFRESH:\n \t\t\t\t\tappendCommandRun(commandId);\n \t\t\t\t\toutputChannel.appendLine(`[command] REFRESH: starting workspace probe`);\n \t\t\t\t\tawait refreshWorkspaceProbe('manual refresh');\n \t\t\t\t\toutputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint sessions reload`);\n \t\t\t\t\tcheckpointSessionsProvider.reload();\n \t\t\t\t\toutputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);\n \t\t\t\t\tcheckpointProvider.reload();\n \t\t\t\t\tawait vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');\n \t\t\t\t\treturn;\n \t\t\t\tcase COMMAND_ID.FETCH_CHECKPOINT_BRANCH:\n \t\t\t\t\tawait fetchCheckpointBranch();\n \t\t\t\t\treturn;\n \t\t\t\tcase COMMAND_ID.BROWSE_CHECKPOINTS:\n \t\t\t\t\tappendCommandRun(commandId);\n \t\t\t\t\toutputChannel.appendLine(`[command] BROWSE_CHECKPOINTS: triggering checkpoint reload and focusing view`);\n \t\t\t\t\tcheckpointProvider.reload();\n \t\t\t\t\tawait vscode.commands.executeCommand(`${CHECKPOINTS_VIEW_ID}.focus`);\n \t\t\t\t\treturn;\n \t\t\t\tcase COMMAND_ID.OPEN_COMMIT_CHANGES: {\n \t\t\t\t\tconst target = normalizeCommitChangesTarget(args[0]);\n \t\t\t\t\tawait openCommitChanges(target);\n \t\t\t\t\treturn;\n \t\t\t\t}\n \t\t\t\tcase COMMAND_ID.OPEN_SESSION_TRANSCRIPT: {\n \t\t\t\t\tconst target = normalizeSessionTranscriptTarget(args[0]);\n \t\t\t\t\tawait openSessionTranscript(target);\n \t\t\t\t\treturn;\n \t\t\t\t}\n \t\t\t\tcase COMMAND_ID.SHOW_STATUS: {\n \t\t\t\t\tawait showStatus();\n \t\t\t\t\tbreak;\n \t\t\t\t}\n+\t\t\t\tcase COMMAND_ID.FOCUS_VIEW: {\n+\t\t\t\t\tappendCommandRun(commandId);\n+\t\t\t\t\tawait vscode.commands.executeCommand('workbench.view.extension.session-bridge');\n+\t\t\t\t\tbreak;\n+\t\t\t\t}\n \t\t\t\tdefault:\n \t\t\t\t\tawait showPlaceholder(commandId);\n \t\t\t}\n \t\t});\n \n \t\tcontext.subscriptions.push(disposable);\n \t}\n \n \toutputChannel.appendLine(`[activate] Registered Entire container: ${ENTIRE_CONTAINER_ID}`);\n \toutputChannel.appendLine(`[activate] Registered views: ${TREE_VIEW_IDS.join(', ')}`);\n }\n \n export function deactivate() { }\n \n /**\n  * Returns the most specific file-backed path the extension can currently anchor on.\n  *\n  * When an editor is focused, the active file path is preferred because it can\n  * belong to a nested repository that differs from the first workspace folder.\n  * If there is no active file, the first workspace folder path is used as a\n  * broader fallback.\n  *\n  * @returns Active file path when available, otherwise the first workspace folder path.\n  */\n function getProbeCandidatePath(): string | undefined {\n \tconst activeEditor = vscode.window.activeTextEditor;\n \tif (isFileBackedEditor(activeEditor)) {\n \t\treturn activeEditor.document.uri.fsPath;\n \t}\n \n \tconst workspaceFolder = vscode.workspace.workspaceFolders?.[0];\n \treturn workspaceFolder?.uri.fsPath;\n }\n \n /**\n  * Resolves the path the extension should use for repository-backed probes and actions.\n  *\n  * This converts the current active file or workspace folder path into the git\n  * repository root when possible, so checkpoint loading and file watchers operate\n  * on the repository that actually owns the current context.\n  *\n  * @returns Repository root for the current UI context, or the original candidate path when no git root can be resolved.\n  */\n async function resolveProbeTargetPath(): Promise<string | undefined> {\n \tconst candidatePath = getProbeCandidatePath();\n \tif (!candidatePath) {\n \t\treturn undefined;\n \t}\n \n \treturn await getGitRepoRoot(candidatePath) ?? candidatePath;\n }\n \n function isFileBackedEditor(editor: vscode.TextEditor | undefined): editor is vscode.TextEditor {\n \treturn editor?.document.uri.scheme === 'file';\n }\n \n async function getBuiltInGitApi(): Promise<GitApi | null> {\n \tconst gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');\n \tif (!gitExtension) {\n \t\treturn null;\n \t}\n \n \tconst gitExports = gitExtension.isActive\n \t\t? gitExtension.exports\n \t\t: await gitExtension.activate();\n \treturn gitExports?.getAPI(1) ?? null;\n }\n \n function normalizeCommitChangesTarget(value: unknown): CommitChangesTarget {\n \tif (!value || typeof value !== \"object\") {\n \t\treturn {};\n \t}\n \n \tconst candidate = value as {\n \t\tcommitSha?: unknown;\n \t\trepoPath?: unknown;\n \t};\n \n \treturn {\n \t\tcommitSha: typeof candidate.commitSha === \"string\" ? candidate.commitSha : undefined,\n \t\trepoPath: typeof candidate.repoPath === \"string\" ? candidate.repoPath : undefined,\n \t};\n }\n \n function normalizeSessionTranscriptTarget(value: unknown): SessionTranscriptTarget | undefined {\n \tif (!value || typeof value !== \"object\") {\n \t\treturn undefined;\n \t}\n \n \tconst candidate = value as SessionTranscriptTarget;\n \tif (typeof candidate.sessionId !== \"string\") {\n \t\treturn undefined;\n \t}\n \tif (candidate.source !== \"live\" && candidate.source !== \"checkpoint\") {\n \t\treturn undefined;\n \t}\n \n \tconst checkpoint = normalizeSessionCheckpointEntry(candidate.checkpoint);\n \tif (!checkpoint) {\n \t\treturn undefined;\n \t}\n \n \treturn {\n \t\tsessionId: candidate.sessionId,\n \t\tpromptPreview: typeof candidate.promptPreview === \"string\" ? candidate.promptPreview : \"\",\n \t\tsource: candidate.source,\n \t\tcheckpoint,\n \t\tlastCheckpointId: typeof candidate.lastCheckpointId === \"string\" ? candidate.lastCheckpointId : undefined,\n \t\ttranscriptPath: typeof candidate.transcriptPath === \"string\" ? candidate.transcriptPath : undefined,\n \t};\n }\n \n function selectTranscriptFromTarget(target: SessionTranscriptTarget): string | null {\n \tif (target.checkpoint.session.metadata.sessionId !== target.sessionId) {\n \t\treturn null;\n \t}\n \n \tconst transcript = target.checkpoint.session.transcript;\n \treturn typeof transcript === \"string\" && transcript.length > 0 ? transcript : null;\n }\n \n function normalizeSessionCheckpointEntry(value: unknown): SessionCheckpointEntry | undefined {\n \tif (!value || typeof value !== \"object\") {\n \t\treturn undefined;\n \t}\n \n \tconst candidate = value as SessionCheckpointEntry;\n \tif (typeof candidate.checkpointId !== \"string\" || typeof candidate.sessionIndex !== \"number\") {\n \t\treturn undefined;\n \t}\n \tif (!candidate.session || typeof candidate.session !== \"object\") {\n \t\treturn undefined;\n \t}\n \tif (typeof candidate.session.metadata?.sessionId !== \"string\") {\n \t\treturn undefined;\n \t}\n \n \treturn candidate;\n }\n",
+              "additions": 9,
+              "deletions": 2,
+              "status": "modified"
+            }
+          ]
+        },
+        "id": "msg_d881330c00013c6i37Tfu8ZMan",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Clicking on Session Bridge plugin status in the status bar should open the plugin view instead of showing the CLI status ",
+          "id": "prt_d881330c10017Zo1npO232yNXH",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881330c00013c6i37Tfu8ZMan"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15081,
+          "input": 14914,
+          "output": 167,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104452302,
+          "completed": 1776104457660
+        },
+        "finish": "tool-calls",
+        "id": "msg_d881330ce001ykhP2kVPMj92OG",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "type": "step-start",
+          "id": "prt_d88133cde001VIHW36lCn5pumr",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881330ce001ykhP2kVPMj92OG"
+        },
+        {
+          "type": "text",
+          "text": "I'll help you modify the status bar item to open the plugin view instead of showing CLI status. Let me first explore the codebase to understand the current implementation.",
+          "time": {
+            "start": 1776104455392,
+            "end": 1776104457607
+          },
+          "id": "prt_d88133ce0001ibMXcl6JAUL72o",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881330ce001ykhP2kVPMj92OG"
+        },
+        {
+          "type": "tool",
+          "tool": "glob",
+          "callID": "toolu_vrtx_011h1MokVoSeABEerbY2J9he",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "**/*status*.ts"
+            },
+            "output": "No files found",
+            "metadata": {
+              "count": 0,
+              "truncated": false
+            },
+            "title": "",
+            "time": {
+              "start": 1776104456401,
+              "end": 1776104456421
+            }
+          },
+          "id": "prt_d88133edd001BhsO8gsKNpHJrh",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881330ce001ykhP2kVPMj92OG"
+        },
+        {
+          "type": "tool",
+          "tool": "glob",
+          "callID": "toolu_vrtx_015wKMB8dWQSQRds2Njt45Fz",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "**/extension.ts"
+            },
+            "output": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+            "metadata": {
+              "count": 1,
+              "truncated": false
+            },
+            "title": "",
+            "time": {
+              "start": 1776104457557,
+              "end": 1776104457569
+            }
+          },
+          "id": "prt_d881340d20010P1Ut5rrQGx9zk",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881330ce001ykhP2kVPMj92OG"
+        },
+        {
+          "type": "tool",
+          "tool": "glob",
+          "callID": "toolu_vrtx_0154jpWQML3PDNujjW8yfbHR",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "**/components/**/*.ts"
+            },
+            "output": "/Users/savekirk/dev/ai/entire/session-bridge/src/test/components/sessionDetailsPanel.test.ts\n/Users/savekirk/dev/ai/entire/session-bridge/src/components/sessionDetailsPanel.ts\n/Users/savekirk/dev/ai/entire/session-bridge/src/components/sessionsTreeView.ts\n/Users/savekirk/dev/ai/entire/session-bridge/src/test/components/sessionsUi.test.ts\n/Users/savekirk/dev/ai/entire/session-bridge/src/components/checkpointTreeView.ts\n/Users/savekirk/dev/ai/entire/session-bridge/src/test/components/checkpointUi.test.ts\n/Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts",
+            "metadata": {
+              "count": 7,
+              "truncated": false
+            },
+            "title": "",
+            "time": {
+              "start": 1776104457593,
+              "end": 1776104457604
+            }
+          },
+          "id": "prt_d88134556001wm4rVazrtjg0E0",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881330ce001ykhP2kVPMj92OG"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15081,
+            "input": 14914,
+            "output": 167,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_d881345880011GWtnrRysHlrhI",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881330ce001ykhP2kVPMj92OG"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 15527,
+          "input": 15393,
+          "output": 134,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 0
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104457660,
+          "completed": 1776104461069
+        },
+        "finish": "tool-calls",
+        "id": "msg_d881345bc002vWsbgy1tL3js7m",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "type": "step-start",
+          "id": "prt_d881350ed001H3eKUfT7PD3hti",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881345bc002vWsbgy1tL3js7m"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "toolu_vrtx_019SKATMgj7UZ5Ujg25BPvu9",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts"
+            },
+            "output": "<path>/Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts</path>\n<type>file</type>\n<content>\n1: import * as vscode from \"vscode\";\n2: import { EntireStatusState, EntireWorkspaceState } from \"../workspaceProbe\";\n3: \n4: interface StatusBarInfo {\n5:   iconName: string;\n6:   title: string;\n7:   description: string;\n8:   backgroundColor?: vscode.ThemeColor;\n9: }\n10: \n11: const WARNING_BACKGROUND = new vscode.ThemeColor(\"statusBarItem.warningBackground\");\n12: \n13: const statusInfoMap: Record<EntireStatusState, StatusBarInfo> = {\n14:   [EntireStatusState.ENABLED]: {\n15:     iconName: \"git-compare\",\n16:     title: \"Enabled\",\n17:     description: \"Entire is enabled for this repository.\",\n18:   },\n19:   [EntireStatusState.CLI_MISSING]: {\n20:     iconName: \"warning\",\n21:     title: \"Not Found\",\n22:     description: \"The Entire CLI is not available in the extension host environment.\",\n23:     backgroundColor: WARNING_BACKGROUND,\n24:   },\n25:   [EntireStatusState.NOT_GIT_REPO]: {\n26:     iconName: \"repo\",\n27:     title: \"Not a git repo\",\n28:     description: \"Open a Git repository to use Entire features.\",\n29:   },\n30:   [EntireStatusState.DISABLED]: {\n31:     iconName: \"circle-slash\",\n32:     title: \"Not Enabled\",\n33:     description: \"Entire is not enabled for this repository.\",\n34:   },\n35: };\n36: \n37: function getStatusBarInfo(workspaceState: EntireWorkspaceState): StatusBarInfo {\n38: \tif (workspaceState.state !== EntireStatusState.ENABLED) {\n39: \t\treturn statusInfoMap[workspaceState.state];\n40: \t}\n41: \n42: \tconst sessionCount = workspaceState.activeSessions.length;\n43: \tif (sessionCount > 1) {\n44: \t\tconst activeCount = workspaceState.activeSessions.filter((session) => session.status === \"ACTIVE\").length;\n45: \t\treturn {\n46: \t\t\ticonName: \"layers\",\n47: \t\t\ttitle: `${sessionCount} Sessions`,\n48: \t\t\tdescription: activeCount > 0\n49: \t\t\t\t? `Multiple Entire sessions are live in this workspace (${activeCount} active).`\n50: \t\t\t\t: \"Multiple Entire sessions are live in this workspace.\",\n51: \t\t};\n52: \t}\n53: \n54: \tif (sessionCount === 1) {\n55: \t\tconst session = workspaceState.activeSessions[0];\n56: \t\tconst agent = formatAgentName(session.agent);\n57: \t\tconst stateLabel = session.status === \"ACTIVE\" ? \"Active\" : \"Idle\";\n58: \n59: \t\treturn {\n60: \t\t\ticonName: session.status === \"ACTIVE\" ? \"pulse\" : \"clock\",\n61: \t\t\ttitle: agent ? `${stateLabel} · ${agent}` : stateLabel,\n62: \t\t\tdescription: session.status === \"ACTIVE\"\n63: \t\t\t\t? \"Entire is actively tracking a session in this workspace.\"\n64: \t\t\t\t: \"Entire is tracking an idle live session in this workspace.\",\n65: \t\t};\n66: \t}\n67: \n68:   return statusInfoMap[EntireStatusState.ENABLED];\n69: }\n70: \n71: function buildTooltip(statusInfo: StatusBarInfo, workspaceState: EntireWorkspaceState): vscode.MarkdownString {\n72:   const tooltip = new vscode.MarkdownString(undefined, true);\n73:   tooltip.isTrusted = false;\n74:   tooltip.supportThemeIcons = true;\n75: \n76:   tooltip.appendMarkdown(`**Entire**\\n\\n`);\n77:   tooltip.appendMarkdown(\"**Status:** \");\n78:   tooltip.appendText(statusInfo.title);\n79:   tooltip.appendText(\"\\n\");\n80:   tooltip.appendText(statusInfo.description);\n81: \n82:   if (workspaceState.binary?.cliVersion) {\n83:     tooltip.appendMarkdown(\"\\n**CLI Version:** \");\n84:     tooltip.appendText(workspaceState.binary.cliVersion);\n85:   }\n86: \n87:   const sessionCount = workspaceState.activeSessions.length;\n88:   tooltip.appendMarkdown(\"\\n\\n**Sessions:** \");\n89:   tooltip.appendText(String(sessionCount));\n90: \n91:   if (sessionCount > 0) {\n92:     for (const session of workspaceState.activeSessions.slice(0, 3)) {\n93:       tooltip.appendMarkdown(\"\\n- \");\n94:       tooltip.appendText(describeSession(session));\n95:     }\n96: \n97:     if (sessionCount > 3) {\n98:       tooltip.appendMarkdown(\"\\n- \");\n99:       tooltip.appendText(`${sessionCount - 3} more session(s)`);\n100:     }\n101:   }\n102: \n103:   if (workspaceState.settings?.settingsPaths.length) {\n104:     tooltip.appendMarkdown(\"\\n\\n**Settings Files:** \");\n105:     tooltip.appendText(String(workspaceState.settings.settingsPaths.length));\n106:   }\n107: \n108:   if (workspaceState.warnings.length > 0) {\n109:     tooltip.appendMarkdown(\"\\n\\n**Warnings**\");\n110:     for (const warning of workspaceState.warnings) {\n111:       tooltip.appendMarkdown(\"\\n- \");\n112:       tooltip.appendText(warning);\n113:     }\n114:   }\n115: \n116:   tooltip.appendMarkdown(\"\\n\\n_Click to show Entire status._\");\n117: \n118:   return tooltip;\n119: }\n120: \n121: function describeSession(session: EntireWorkspaceState[\"activeSessions\"][number]): string {\n122: \tconst parts: string[] = [];\n123: \tconst agent = formatAgentName(session.agent);\n124: \n125: \tif (agent) {\n126: \t\tparts.push(agent);\n127: \t}\n128: \tif (session.model) {\n129: \t\tparts.push(session.model);\n130: \t}\n131: \tif (session.status) {\n132: \t\tparts.push(session.status);\n133: \t}\n134: \tif (session.sessionId) {\n135: \t\tparts.push(`#${session.sessionId.slice(0, 8)}`);\n136: \t}\n137: \n138:   return parts.join(\" · \");\n139: }\n140: \n141: function formatAgentName(agentType?: string): string | undefined {\n142:   if (!agentType) {\n143:     return undefined;\n144:   }\n145: \n146:   return agentType\n147:     .split(/[-_]/g)\n148:     .filter(Boolean)\n149:     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))\n150:     .join(\" \");\n151: }\n152: \n153: export function createStatusBarItem(command: string, workspaceState: EntireWorkspaceState): vscode.StatusBarItem {\n154:   const statusBarItem = vscode.window.createStatusBarItem(\n155:     \"session.bridge.entire.status\",\n156:     vscode.StatusBarAlignment.Left,\n157:     100,\n158:   );\n159:   updateStatusBarItem(statusBarItem, command, workspaceState);\n160: \n161:   return statusBarItem;\n162: }\n163: \n164: export function updateStatusBarItem(\n165:   statusBarItem: vscode.StatusBarItem,\n166:   command: string,\n167:   workspaceState: EntireWorkspaceState,\n168: ): void {\n169:   const statusInfo = getStatusBarInfo(workspaceState);\n170:   const label = `Session Bridge (Entire): ${statusInfo.title}`;\n171: \n172:   statusBarItem.name = \"Session Bridge Status\";\n173:   statusBarItem.text = `$(${statusInfo.iconName}) ${label}`;\n174:   statusBarItem.tooltip = buildTooltip(statusInfo, workspaceState);\n175:   statusBarItem.command = command;\n176:   statusBarItem.backgroundColor = statusInfo.backgroundColor;\n177:   statusBarItem.accessibilityInformation = {\n178:     label,\n179:     role: \"button\",\n180:   };\n181: }\n\n(End of file - total 181 lines)\n</content>",
+            "metadata": {
+              "preview": "import * as vscode from \"vscode\";\nimport { EntireStatusState, EntireWorkspaceState } from \"../workspaceProbe\";\n\ninterface StatusBarInfo {\n  iconName: string;\n  title: string;\n  description: string;\n  backgroundColor?: vscode.ThemeColor;\n}\n\nconst WARNING_BACKGROUND = new vscode.ThemeColor(\"statusBarItem.warningBackground\");\n\nconst statusInfoMap: Record<EntireStatusState, StatusBarInfo> = {\n  [EntireStatusState.ENABLED]: {\n    iconName: \"git-compare\",\n    title: \"Enabled\",\n    description: \"Entire is enabled for this repository.\",\n  },\n  [EntireStatusState.CLI_MISSING]: {\n    iconName: \"warning\",",
+              "truncated": false,
+              "loaded": []
+            },
+            "title": "src/components/entireStatusBarItem.ts",
+            "time": {
+              "start": 1776104460993,
+              "end": 1776104461006
+            }
+          },
+          "id": "prt_d881350ee001uEMP4Xm9B4KJ7K",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881345bc002vWsbgy1tL3js7m"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "toolu_vrtx_0176HBXSL2CWCbaCbrJQmEMi",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts"
+            },
+            "output": "<path>/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts</path>\n<type>file</type>\n<content>\n1: import * as vscode from 'vscode';\n2: import * as path from 'path';\n3: import { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';\n4: import { getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';\n5: import { fetchDefaultCheckpointBranch } from './checkpointBranch';\n6: import { EntireStatusState, probeEntireWorkspace, resetAutomaticCheckpointFetchAttempt } from './workspaceProbe';\n7: import { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';\n8: import { SessionDetailsPanel } from './components/sessionDetailsPanel';\n9: import { SessionsTreeViewProvider, getSessionDetailTarget, type SessionsViewCommands } from './components/sessionsTreeView';\n10: import { CheckpointTreeViewProvider, getCheckpointSelectionContext, type CheckpointViewCommands } from './components/checkpointTreeView';\n11: import { getRawTranscript, getSessionDetail, type SessionCheckpointEntry, type SessionTranscriptTarget } from './checkpoints';\n12: import { runCommandAsync } from './runCommand';\n13: \n14: const ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';\n15: const ENTIRE_CONTAINER_ID = 'session-bridge';\n16: const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';\n17: const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';\n18: const enum COMMAND_ID {\n19: \tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n20: \tENABLE = \"session.bridge.entire.enable\",\n21: \tDISABLE = \"session.bridge.entire.disable\",\n22: \tREFRESH = \"session.bridge.entire.refresh\",\n23: \tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n24: \tBROWSE_CHECKPOINTS = \"session.bridge.entire.browseCheckpoints\",\n25: \tOPEN_COMMIT_CHANGES = \"session.bridge.entire.openCommitChanges\",\n26: \tOPEN_SESSION_TRANSCRIPT = \"session.bridge.entire.openSessionTranscript\",\n27: \tCLEAN = \"session.bridge.entire.clean\",\n28: \tRESET = \"session.bridge.entire.reset\",\n29: \tSHOW_TRACE = \"session.bridge.entire.showTrace\"\n30: }\n31: \n32: const TREE_VIEW_IDS = [\n33: \tSESSIONS_VIEW_ID,\n34: \tCHECKPOINTS_VIEW_ID,\n35: ] as const;\n36: \n37: const COMMAND_TITLES: Record<COMMAND_ID, string> = {\n38: \t[COMMAND_ID.SHOW_STATUS]: 'Show Status',\n39: \t[COMMAND_ID.ENABLE]: 'Enable In Repository',\n40: \t[COMMAND_ID.DISABLE]: 'Disable In Repository',\n41: \t[COMMAND_ID.REFRESH]: 'Refresh',\n42: \t[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',\n43: \t[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',\n44: \t[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',\n45: \t[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',\n46: \t[COMMAND_ID.CLEAN]: 'Clean Entire State',\n47: \t[COMMAND_ID.RESET]: 'Reset Entire Session Data',\n48: \t[COMMAND_ID.SHOW_TRACE]: 'Show Trace'\n49: };\n50: \n51: \n52: const WORKSPACE_CONTEXT: [EntireStatusState, string][] = [\n53: \t[EntireStatusState.CLI_MISSING, 'session.bridge.state.cli-missing'],\n54: \t[EntireStatusState.DISABLED, 'session.bridge.state.disabled'],\n55: \t[EntireStatusState.ENABLED, 'session.bridge.state.enabled'],\n56: \t[EntireStatusState.NOT_GIT_REPO, 'session.bridge.state.not-git-repo']\n57: ];\n58: \n59: interface GitApi {\n60: \tgetRepository(uri: vscode.Uri): GitRepository | null;\n61: \topenRepository(uri: vscode.Uri): Promise<GitRepository | null>;\n62: }\n63: \n64: interface GitRepository {\n65: \treadonly rootUri: vscode.Uri;\n66: }\n67: \n68: interface GitExtension {\n69: \tgetAPI(version: 1): GitApi;\n70: }\n71: \n72: interface CommitChangesTarget {\n73: \tcommitSha?: string;\n74: \trepoPath?: string;\n75: }\n76: \n77: const setWorkspaceContext = async (\n78: \tworkspaceState: EntireStatusState,\n79: ) => {\n80: \tfor (const context of WORKSPACE_CONTEXT) {\n81: \t\tconst status = context[0] === workspaceState;\n82: \t\tconst key = context[1];\n83: \t\tawait vscode.commands.executeCommand('setContext', key, status);\n84: \t}\n85: };\n86: \n87: export async function activate(context: vscode.ExtensionContext): Promise<void> {\n88: \tconst outputChannel = vscode.window.createOutputChannel(ENTIRE_OUTPUT_CHANNEL);\n89: \tcontext.subscriptions.push(outputChannel);\n90: \n91: \tconst initialProbeTarget = await resolveProbeTargetPath();\n92: \tlet workspaceState = await probeEntireWorkspace(initialProbeTarget);\n93: \tawait setWorkspaceContext(workspaceState.state);\n94: \tconst statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);\n95: \tif (vscode.workspace.workspaceFolders?.length) {\n96: \t\tstatusBarItem.show();\n97: \t\tcontext.subscriptions.push(statusBarItem);\n98: \t}\n99: \n100: \tconst checkpointCommands = {\n101: \t\trefresh: COMMAND_ID.REFRESH,\n102: \t\topenCommitChanges: COMMAND_ID.OPEN_COMMIT_CHANGES,\n103: \t} satisfies CheckpointViewCommands;\n104: \n105: \tconst checkpointProvider = new CheckpointTreeViewProvider(\n106: \t\tworkspaceState,\n107: \t\tinitialProbeTarget,\n108: \t\tcheckpointCommands,\n109: \t\toutputChannel,\n110: \t);\n111: \tconst sessionCommands = {\n112: \t\trefresh: COMMAND_ID.REFRESH,\n113: \t\tshowStatus: COMMAND_ID.SHOW_STATUS,\n114: \t\topenSessionTranscript: COMMAND_ID.OPEN_SESSION_TRANSCRIPT,\n115: \t} satisfies SessionsViewCommands;\n116: \tconst checkpointSessionsProvider = new SessionsTreeViewProvider(\n117: \t\tworkspaceState,\n118: \t\tinitialProbeTarget,\n119: \t\tsessionCommands,\n120: \t\toutputChannel,\n121: \t);\n122: \tconst sessionDetailsPanel = new SessionDetailsPanel(outputChannel);\n123: \tcontext.subscriptions.push(sessionDetailsPanel);\n124: \n125: \tconst checkpointSessionsTreeView = vscode.window.createTreeView(SESSIONS_VIEW_ID, {\n126: \t\ttreeDataProvider: checkpointSessionsProvider,\n127: \t\tshowCollapseAll: true,\n128: \t});\n129: \tcontext.subscriptions.push(checkpointSessionsTreeView);\n130: \tconst checkpointTreeView = vscode.window.createTreeView(CHECKPOINTS_VIEW_ID, {\n131: \t\ttreeDataProvider: checkpointProvider,\n132: \t\tshowCollapseAll: true,\n133: \t});\n134: \tcontext.subscriptions.push(checkpointTreeView);\n135: \tcontext.subscriptions.push(checkpointTreeView.onDidChangeSelection((event) => {\n136: \t\tconst selection = getCheckpointSelectionContext(event.selection[0]);\n137: \t\toutputChannel.appendLine(\n138: \t\t\t`[checkpoint-selection] checkpointId=${selection?.checkpointId ?? \"(none)\"}, sessionPaths=${selection?.sessionPaths.length ?? 0}`,\n139: \t\t);\n140: \t\tcheckpointSessionsProvider.setCheckpointSelection(selection);\n141: \t}));\n142: \n143: \tlet sessionDetailLoadGeneration = 0;\n144: \tconst showSelectedSessionDetail = async (selection: vscode.TreeItem | undefined) => {\n145: \t\tconst target = getSessionDetailTarget(selection);\n146: \t\tif (!target) {\n147: \t\t\treturn;\n148: \t\t}\n149: \n150: \t\tconst repoPath = await resolveProbeTargetPath();\n151: \t\tif (!repoPath) {\n152: \t\t\tsessionDetailsPanel.showError(\"Open a repository folder to inspect session details.\");\n153: \t\t\treturn;\n154: \t\t}\n155: \n156: \t\tconst generation = ++sessionDetailLoadGeneration;\n157: \t\tsessionDetailsPanel.showLoading(target);\n158: \n159: \t\ttry {\n160: \t\t\tconst detail = await getSessionDetail(repoPath, target);\n161: \t\t\tif (generation !== sessionDetailLoadGeneration) {\n162: \t\t\t\treturn;\n163: \t\t\t}\n164: \n165: \t\t\tif (!detail) {\n166: \t\t\t\tsessionDetailsPanel.showError(\"Session details are no longer available for the selected item.\");\n167: \t\t\t\treturn;\n168: \t\t\t}\n169: \n170: \t\t\tsessionDetailsPanel.showDetail(detail);\n171: \t\t} catch (error) {\n172: \t\t\tconst message = error instanceof Error ? error.message : \"Failed to load session details\";\n173: \t\t\toutputChannel.appendLine(`[session-details] load error: ${message}`);\n174: \t\t\tif (generation !== sessionDetailLoadGeneration) {\n175: \t\t\t\treturn;\n176: \t\t\t}\n177: \n178: \t\t\tsessionDetailsPanel.showError(message);\n179: \t\t}\n180: \t};\n181: \tcontext.subscriptions.push(checkpointSessionsTreeView.onDidChangeSelection((event) => {\n182: \t\tvoid showSelectedSessionDetail(event.selection[0]);\n183: \t}));\n184: \n185: \tconst appendCommandRun = (commandId: COMMAND_ID) => {\n186: \t\toutputChannel.appendLine(`[command] ${COMMAND_TITLES[commandId] ?? commandId}`);\n187: \t};\n188: \n189: \tlet probeWatchers: vscode.Disposable[] = [];\n190: \tlet watchedRepoPath: string | undefined;\n191: \tlet pendingProbeRefresh: NodeJS.Timeout | undefined;\n192: \n193: \tconst disposeProbeWatchers = () => {\n194: \t\tfor (const disposable of probeWatchers) {\n195: \t\t\tdisposable.dispose();\n196: \t\t}\n197: \t\tprobeWatchers = [];\n198: \t\twatchedRepoPath = undefined;\n199: \t};\n200: \n201: \tconst scheduleProbeRefresh = (reason: string) => {\n202: \t\tif (pendingProbeRefresh) {\n203: \t\t\tclearTimeout(pendingProbeRefresh);\n204: \t\t}\n205: \n206: \t\tpendingProbeRefresh = setTimeout(() => {\n207: \t\t\tpendingProbeRefresh = undefined;\n208: \t\t\tvoid refreshWorkspaceProbe(reason);\n209: \t\t}, 150);\n210: \t};\n211: \n212: \n213: \tconst addProbeWatcher = (watcher: vscode.FileSystemWatcher, reason: string) => {\n214: \t\tprobeWatchers.push(\n215: \t\t\twatcher,\n216: \t\t\twatcher.onDidCreate(() => scheduleProbeRefresh(reason)),\n217: \t\t\twatcher.onDidChange(() => scheduleProbeRefresh(reason)),\n218: \t\t\twatcher.onDidDelete(() => scheduleProbeRefresh(reason)),\n219: \t\t);\n220: \t};\n221: \n222: \tconst updateProbeWatchers = async (repoPath: string | undefined) => {\n223: \t\tif (!repoPath) {\n224: \t\t\tdisposeProbeWatchers();\n225: \t\t\treturn;\n226: \t\t}\n227: \n228: \t\tif (watchedRepoPath === repoPath && probeWatchers.length > 0) {\n229: \t\t\treturn;\n230: \t\t}\n231: \n232: \t\tdisposeProbeWatchers();\n233: \t\twatchedRepoPath = repoPath;\n234: \n235: \t\taddProbeWatcher(\n236: \t\t\tvscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(repoPath, '.entire/settings*.json')),\n237: \t\t\t'entire settings changed',\n238: \t\t);\n239: \n240: \t\tconst headRelativePath = (await tryExecGit(repoPath, ['rev-parse', '--git-path', 'HEAD']))?.trim();\n241: \t\tif (headRelativePath) {\n242: \t\t\tconst headAbsolutePath = path.resolve(repoPath, headRelativePath);\n243: \t\t\taddProbeWatcher(\n244: \t\t\t\tvscode.workspace.createFileSystemWatcher(\n245: \t\t\t\t\tnew vscode.RelativePattern(path.dirname(headAbsolutePath), path.basename(headAbsolutePath)),\n246: \t\t\t\t),\n247: \t\t\t\t'git HEAD changed',\n248: \t\t\t);\n249: \t\t}\n250: \n251: \t\tconst gitCommonDir = await getGitCommonDir(repoPath);\n252: \t\tif (gitCommonDir) {\n253: \t\t\taddProbeWatcher(\n254: \t\t\t\tvscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(gitCommonDir, 'entire-sessions/*.json')),\n255: \t\t\t\t'live session state changed',\n256: \t\t\t);\n257: \t\t}\n258: \t};\n259: \n260: \tconst showPlaceholder = async (commandId: COMMAND_ID, message?: string) => {\n261: \t\tappendCommandRun(commandId);\n262: \t\toutputChannel.show(true);\n263: \t\tawait vscode.window.showInformationMessage(message ?? `${COMMAND_TITLES[commandId]} is not implemented yet.`);\n264: \t};\n265: \n266: \tconst showStatus = async () => {\n267: \t\tappendCommandRun(COMMAND_ID.SHOW_STATUS);\n268: \t\toutputChannel.show(true);\n269: \t\ttry {\n270: \t\t\tconst resolved = await resolveEntireBinary();\n271: \t\t\tif (isEntireBinary(resolved)) {\n272: \t\t\t\tawait vscode.window.showInformationMessage(resolved.raw);\n273: \t\t\t} else {\n274: \t\t\t\tawait vscode.window.showErrorMessage(resolved.message);\n275: \t\t\t}\n276: \t\t} catch (error) {\n277: \t\t\tconsole.error(error);\n278: \t\t\tawait vscode.window.showErrorMessage(\"Error getting status of entire cli. Make sure the cli is installed and try again\");\n279: \t\t}\n280: \t};\n281: \n282: \tconst refreshWorkspaceProbe = async (reason: string) => {\n283: \t\tconst cwd = await resolveProbeTargetPath();\n284: \t\tif (reason === 'manual refresh' && cwd) {\n285: \t\t\tresetAutomaticCheckpointFetchAttempt(cwd);\n286: \t\t}\n287: \t\tworkspaceState = await probeEntireWorkspace(cwd);\n288: \t\tawait setWorkspaceContext(workspaceState.state);\n289: \t\tawait updateProbeWatchers(cwd);\n290: \t\tupdateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);\n291: \t\tcheckpointSessionsProvider.setWorkspaceState(workspaceState, cwd);\n292: \t\tcheckpointSessionsProvider.refresh();\n293: \t\tcheckpointProvider.setWorkspaceState(workspaceState, cwd);\n294: \t\tcheckpointProvider.refresh();\n295: \n296: \t\tif (cwd) {\n297: \t\t\toutputChannel.appendLine(`[probe] ${reason}: ${cwd}`);\n298: \t\t\treturn;\n299: \t\t}\n300: \n301: \t\toutputChannel.appendLine(`[probe] ${reason}: no file-backed workspace target`);\n302: \t};\n303: \n304: \tconst fetchCheckpointBranch = async () => {\n305: \t\tappendCommandRun(COMMAND_ID.FETCH_CHECKPOINT_BRANCH);\n306: \t\toutputChannel.show(true);\n307: \n308: \t\tconst repoPath = await resolveProbeTargetPath();\n309: \t\tif (!repoPath) {\n310: \t\t\tawait vscode.window.showWarningMessage(\"Open a repository folder to fetch Entire checkpoint metadata.\");\n311: \t\t\treturn;\n312: \t\t}\n313: \n314: \t\tconst fetchResult = await fetchDefaultCheckpointBranch(repoPath);\n315: \t\tif (fetchResult.reason === \"no-remote\") {\n316: \t\t\tawait vscode.window.showWarningMessage(\"No Git remote is configured for this repository.\");\n317: \t\t\treturn;\n318: \t\t}\n319: \n320: \t\tconst remoteName = fetchResult.remoteName ?? \"unknown remote\";\n321: \t\toutputChannel.appendLine(`[fetch] Attempting ${METADATA_BRANCH_NAME} from ${remoteName}`);\n322: \n323: \t\tif (!fetchResult.fetched) {\n324: \t\t\tconst details = fetchResult.details ?? \"unknown fetch failure\";\n325: \t\t\toutputChannel.appendLine(`[fetch] Failed: ${details}`);\n326: \t\t\tawait vscode.window.showWarningMessage(\n327: \t\t\t\t`Could not fetch ${METADATA_BRANCH_NAME} from ${remoteName}. ${details}`,\n328: \t\t\t);\n329: \t\t\treturn;\n330: \t\t}\n331: \n332: \t\toutputChannel.appendLine(`[fetch] Fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);\n333: \t\tawait refreshWorkspaceProbe(`fetched ${METADATA_BRANCH_NAME} from ${remoteName}`);\n334: \t\tcheckpointSessionsProvider.reload();\n335: \t\tcheckpointProvider.reload();\n336: \t\tawait vscode.window.showInformationMessage(`Fetched ${METADATA_BRANCH_NAME} from ${remoteName}.`);\n337: \t};\n338: \n339: \tconst openCommitChanges = async (target: CommitChangesTarget) => {\n340: \t\tappendCommandRun(COMMAND_ID.OPEN_COMMIT_CHANGES);\n341: \t\tif (!target.commitSha) {\n342: \t\t\tawait vscode.window.showWarningMessage(\"Checkpoint changes could not be opened.\");\n343: \t\t\treturn;\n344: \t\t}\n345: \n346: \t\tconst repoPath = target.repoPath ?? await resolveProbeTargetPath();\n347: \t\tif (!repoPath) {\n348: \t\t\tawait vscode.window.showWarningMessage(\"Open a repository folder to inspect commit changes.\");\n349: \t\t\treturn;\n350: \t\t}\n351: \n352: \t\tconst gitApi = await getBuiltInGitApi();\n353: \t\tif (!gitApi) {\n354: \t\t\tawait vscode.window.showWarningMessage(\"VS Code Git integration is not available.\");\n355: \t\t\treturn;\n356: \t\t}\n357: \n358: \t\tlet repository = gitApi.getRepository(vscode.Uri.file(repoPath));\n359: \t\tif (!repository) {\n360: \t\t\trepository = await gitApi.openRepository(vscode.Uri.file(repoPath));\n361: \t\t}\n362: \n363: \t\tif (!repository) {\n364: \t\t\tawait vscode.window.showWarningMessage(\"The repository is not available in VS Code Git.\");\n365: \t\t\treturn;\n366: \t\t}\n367: \n368: \t\tawait vscode.commands.executeCommand('git.viewCommit', repository, target.commitSha);\n369: \t};\n370: \n371: \tconst openSessionTranscript = async (target: SessionTranscriptTarget | undefined) => {\n372: \t\tappendCommandRun(COMMAND_ID.OPEN_SESSION_TRANSCRIPT);\n373: \t\tif (!target) {\n374: \t\t\tawait vscode.window.showWarningMessage(\"Session transcript could not be opened.\");\n375: \t\t\treturn;\n376: \t\t}\n377: \n378: \t\tif (target.transcriptPath) {\n379: \t\t\ttry {\n380: \t\t\t\tawait vscode.commands.executeCommand(\"vscode.open\", vscode.Uri.file(target.transcriptPath));\n381: \t\t\t\treturn;\n382: \t\t\t} catch (error) {\n383: \t\t\t\tconst message = error instanceof Error ? error.message : String(error);\n384: \t\t\t\toutputChannel.appendLine(`[session-transcript] failed to open ${target.transcriptPath}: ${message}`);\n385: \t\t\t}\n386: \t\t}\n387: \n388: \t\tlet transcript = selectTranscriptFromTarget(target);\n389: \t\tif (!transcript) {\n390: \t\t\tconst repoPath = await resolveProbeTargetPath();\n391: \t\t\tif (repoPath) {\n392: \t\t\t\ttranscript = await getRawTranscript(repoPath, target.checkpoint.checkpointId, target.sessionId);\n393: \t\t\t}\n394: \t\t}\n395: \n396: \t\tif (!transcript) {\n397: \t\t\tawait vscode.window.showWarningMessage(\"No transcript is available for the selected session.\");\n398: \t\t\treturn;\n399: \t\t}\n400: \n401: \t\tconst document = await vscode.workspace.openTextDocument({\n402: \t\t\tlanguage: \"plaintext\",\n403: \t\t\tcontent: transcript,\n404: \t\t});\n405: \t\tawait vscode.window.showTextDocument(document, { preview: false });\n406: \t};\n407: \n408: \tawait updateProbeWatchers(await resolveProbeTargetPath());\n409: \tcontext.subscriptions.push({\n410: \t\tdispose: () => {\n411: \t\t\tif (pendingProbeRefresh) {\n412: \t\t\t\tclearTimeout(pendingProbeRefresh);\n413: \t\t\t\tpendingProbeRefresh = undefined;\n414: \t\t\t}\n415: \t\t\tdisposeProbeWatchers();\n416: \t\t},\n417: \t});\n418: \n419: \tcontext.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(async (editor) => {\n420: \t\tif (!isFileBackedEditor(editor)) {\n421: \t\t\treturn;\n422: \t\t}\n423: \n424: \t\tawait refreshWorkspaceProbe('active editor changed');\n425: \t}));\n426: \n427: \tcontext.subscriptions.push(vscode.workspace.onDidOpenTextDocument(async (document) => {\n428: \t\tif (document.uri.scheme !== 'file') {\n429: \t\t\treturn;\n430: \t\t}\n431: \n432: \t\tawait refreshWorkspaceProbe('file opened');\n433: \t}));\n434: \n435: \tfor (const commandId of Object.keys(COMMAND_TITLES) as COMMAND_ID[]) {\n436: \t\tconst disposable = vscode.commands.registerCommand(commandId, async (...args: unknown[]) => {\n437: \t\t\tswitch (commandId) {\n438: \t\t\t\tcase COMMAND_ID.REFRESH:\n439: \t\t\t\t\tappendCommandRun(commandId);\n440: \t\t\t\t\toutputChannel.appendLine(`[command] REFRESH: starting workspace probe`);\n441: \t\t\t\t\tawait refreshWorkspaceProbe('manual refresh');\n442: \t\t\t\t\toutputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint sessions reload`);\n443: \t\t\t\t\tcheckpointSessionsProvider.reload();\n444: \t\t\t\t\toutputChannel.appendLine(`[command] REFRESH: probe done, triggering checkpoint reload`);\n445: \t\t\t\t\tcheckpointProvider.reload();\n446: \t\t\t\t\tawait vscode.window.showInformationMessage('Session Bridge Entire views refreshed.');\n447: \t\t\t\t\treturn;\n448: \t\t\t\tcase COMMAND_ID.FETCH_CHECKPOINT_BRANCH:\n449: \t\t\t\t\tawait fetchCheckpointBranch();\n450: \t\t\t\t\treturn;\n451: \t\t\t\tcase COMMAND_ID.BROWSE_CHECKPOINTS:\n452: \t\t\t\t\tappendCommandRun(commandId);\n453: \t\t\t\t\toutputChannel.appendLine(`[command] BROWSE_CHECKPOINTS: triggering checkpoint reload and focusing view`);\n454: \t\t\t\t\tcheckpointProvider.reload();\n455: \t\t\t\t\tawait vscode.commands.executeCommand(`${CHECKPOINTS_VIEW_ID}.focus`);\n456: \t\t\t\t\treturn;\n457: \t\t\t\tcase COMMAND_ID.OPEN_COMMIT_CHANGES: {\n458: \t\t\t\t\tconst target = normalizeCommitChangesTarget(args[0]);\n459: \t\t\t\t\tawait openCommitChanges(target);\n460: \t\t\t\t\treturn;\n461: \t\t\t\t}\n462: \t\t\t\tcase COMMAND_ID.OPEN_SESSION_TRANSCRIPT: {\n463: \t\t\t\t\tconst target = normalizeSessionTranscriptTarget(args[0]);\n464: \t\t\t\t\tawait openSessionTranscript(target);\n465: \t\t\t\t\treturn;\n466: \t\t\t\t}\n467: \t\t\t\tcase COMMAND_ID.SHOW_STATUS: {\n468: \t\t\t\t\tawait showStatus();\n469: \t\t\t\t\tbreak;\n470: \t\t\t\t}\n471: \t\t\t\tdefault:\n472: \t\t\t\t\tawait showPlaceholder(commandId);\n473: \t\t\t}\n474: \t\t});\n475: \n476: \t\tcontext.subscriptions.push(disposable);\n477: \t}\n478: \n479: \toutputChannel.appendLine(`[activate] Registered Entire container: ${ENTIRE_CONTAINER_ID}`);\n480: \toutputChannel.appendLine(`[activate] Registered views: ${TREE_VIEW_IDS.join(', ')}`);\n481: }\n482: \n483: export function deactivate() { }\n484: \n485: /**\n486:  * Returns the most specific file-backed path the extension can currently anchor on.\n487:  *\n488:  * When an editor is focused, the active file path is preferred because it can\n489:  * belong to a nested repository that differs from the first workspace folder.\n490:  * If there is no active file, the first workspace folder path is used as a\n491:  * broader fallback.\n492:  *\n493:  * @returns Active file path when available, otherwise the first workspace folder path.\n494:  */\n495: function getProbeCandidatePath(): string | undefined {\n496: \tconst activeEditor = vscode.window.activeTextEditor;\n497: \tif (isFileBackedEditor(activeEditor)) {\n498: \t\treturn activeEditor.document.uri.fsPath;\n499: \t}\n500: \n501: \tconst workspaceFolder = vscode.workspace.workspaceFolders?.[0];\n502: \treturn workspaceFolder?.uri.fsPath;\n503: }\n504: \n505: /**\n506:  * Resolves the path the extension should use for repository-backed probes and actions.\n507:  *\n508:  * This converts the current active file or workspace folder path into the git\n509:  * repository root when possible, so checkpoint loading and file watchers operate\n510:  * on the repository that actually owns the current context.\n511:  *\n512:  * @returns Repository root for the current UI context, or the original candidate path when no git root can be resolved.\n513:  */\n514: async function resolveProbeTargetPath(): Promise<string | undefined> {\n515: \tconst candidatePath = getProbeCandidatePath();\n516: \tif (!candidatePath) {\n517: \t\treturn undefined;\n518: \t}\n519: \n520: \treturn await getGitRepoRoot(candidatePath) ?? candidatePath;\n521: }\n522: \n523: function isFileBackedEditor(editor: vscode.TextEditor | undefined): editor is vscode.TextEditor {\n524: \treturn editor?.document.uri.scheme === 'file';\n525: }\n526: \n527: async function getBuiltInGitApi(): Promise<GitApi | null> {\n528: \tconst gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');\n529: \tif (!gitExtension) {\n530: \t\treturn null;\n531: \t}\n532: \n533: \tconst gitExports = gitExtension.isActive\n534: \t\t? gitExtension.exports\n535: \t\t: await gitExtension.activate();\n536: \treturn gitExports?.getAPI(1) ?? null;\n537: }\n538: \n539: function normalizeCommitChangesTarget(value: unknown): CommitChangesTarget {\n540: \tif (!value || typeof value !== \"object\") {\n541: \t\treturn {};\n542: \t}\n543: \n544: \tconst candidate = value as {\n545: \t\tcommitSha?: unknown;\n546: \t\trepoPath?: unknown;\n547: \t};\n548: \n549: \treturn {\n550: \t\tcommitSha: typeof candidate.commitSha === \"string\" ? candidate.commitSha : undefined,\n551: \t\trepoPath: typeof candidate.repoPath === \"string\" ? candidate.repoPath : undefined,\n552: \t};\n553: }\n554: \n555: function normalizeSessionTranscriptTarget(value: unknown): SessionTranscriptTarget | undefined {\n556: \tif (!value || typeof value !== \"object\") {\n557: \t\treturn undefined;\n558: \t}\n559: \n560: \tconst candidate = value as SessionTranscriptTarget;\n561: \tif (typeof candidate.sessionId !== \"string\") {\n562: \t\treturn undefined;\n563: \t}\n564: \tif (candidate.source !== \"live\" && candidate.source !== \"checkpoint\") {\n565: \t\treturn undefined;\n566: \t}\n567: \n568: \tconst checkpoint = normalizeSessionCheckpointEntry(candidate.checkpoint);\n569: \tif (!checkpoint) {\n570: \t\treturn undefined;\n571: \t}\n572: \n573: \treturn {\n574: \t\tsessionId: candidate.sessionId,\n575: \t\tpromptPreview: typeof candidate.promptPreview === \"string\" ? candidate.promptPreview : \"\",\n576: \t\tsource: candidate.source,\n577: \t\tcheckpoint,\n578: \t\tlastCheckpointId: typeof candidate.lastCheckpointId === \"string\" ? candidate.lastCheckpointId : undefined,\n579: \t\ttranscriptPath: typeof candidate.transcriptPath === \"string\" ? candidate.transcriptPath : undefined,\n580: \t};\n581: }\n582: \n583: function selectTranscriptFromTarget(target: SessionTranscriptTarget): string | null {\n584: \tif (target.checkpoint.session.metadata.sessionId !== target.sessionId) {\n585: \t\treturn null;\n586: \t}\n587: \n588: \tconst transcript = target.checkpoint.session.transcript;\n589: \treturn typeof transcript === \"string\" && transcript.length > 0 ? transcript : null;\n590: }\n591: \n592: function normalizeSessionCheckpointEntry(value: unknown): SessionCheckpointEntry | undefined {\n593: \tif (!value || typeof value !== \"object\") {\n594: \t\treturn undefined;\n595: \t}\n596: \n597: \tconst candidate = value as SessionCheckpointEntry;\n598: \tif (typeof candidate.checkpointId !== \"string\" || typeof candidate.sessionIndex !== \"number\") {\n599: \t\treturn undefined;\n600: \t}\n601: \tif (!candidate.session || typeof candidate.session !== \"object\") {\n602: \t\treturn undefined;\n603: \t}\n604: \tif (typeof candidate.session.metadata?.sessionId !== \"string\") {\n605: \t\treturn undefined;\n606: \t}\n607: \n608: \treturn candidate;\n609: }\n\n(End of file - total 609 lines)\n</content>",
+            "metadata": {
+              "preview": "import * as vscode from 'vscode';\nimport * as path from 'path';\nimport { isEntireBinary, resolveEntireBinary } from './entireBinaryResolver';\nimport { getGitCommonDir, getGitRepoRoot, METADATA_BRANCH_NAME, tryExecGit } from './checkpoints/util';\nimport { fetchDefaultCheckpointBranch } from './checkpointBranch';\nimport { EntireStatusState, probeEntireWorkspace, resetAutomaticCheckpointFetchAttempt } from './workspaceProbe';\nimport { createStatusBarItem, updateStatusBarItem } from './components/entireStatusBarItem';\nimport { SessionDetailsPanel } from './components/sessionDetailsPanel';\nimport { SessionsTreeViewProvider, getSessionDetailTarget, type SessionsViewCommands } from './components/sessionsTreeView';\nimport { CheckpointTreeViewProvider, getCheckpointSelectionContext, type CheckpointViewCommands } from './components/checkpointTreeView';\nimport { getRawTranscript, getSessionDetail, type SessionCheckpointEntry, type SessionTranscriptTarget } from './checkpoints';\nimport { runCommandAsync } from './runCommand';\n\nconst ENTIRE_OUTPUT_CHANNEL = 'SESSION_BRIDGE';\nconst ENTIRE_CONTAINER_ID = 'session-bridge';\nconst SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';\nconst CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';\nconst enum COMMAND_ID {\n\tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n\tENABLE = \"session.bridge.entire.enable\",",
+              "truncated": false,
+              "loaded": []
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104461014,
+              "end": 1776104461018
+            }
+          },
+          "id": "prt_d881352c2001XOKdT1Fn0r6XwZ",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881345bc002vWsbgy1tL3js7m"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "type": "step-finish",
+          "tokens": {
+            "total": 15527,
+            "input": 15393,
+            "output": 134,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 0
+            }
+          },
+          "cost": 0,
+          "id": "prt_d881352db001RZ71bogtuidGXQ",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881345bc002vWsbgy1tL3js7m"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 26369,
+          "input": 10757,
+          "output": 225,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 15387
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104461070,
+          "completed": 1776104469863
+        },
+        "finish": "tool-calls",
+        "id": "msg_d8813530e001HDDtQ6poBuqMmd",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "type": "step-start",
+          "id": "prt_d88135bc8001KOPmhSOMKwIHCt",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8813530e001HDDtQ6poBuqMmd"
+        },
+        {
+          "type": "text",
+          "text": "Now I can see the issue. The status bar item is created with the command `COMMAND_ID.SHOW_STATUS` (line 94 in extension.ts), which shows the CLI status output. Looking at the code:\n\n1. Line 94: `const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);`\n2. Line 116: The tooltip says \"_Click to show Entire status._\" \n3. Lines 266-280: The `showStatus` function displays CLI information\n\nTo open the plugin view instead, I need to change the command to focus on one of the tree views. Let me check what command would be appropriate:",
+          "time": {
+            "start": 1776104463306,
+            "end": 1776104469811
+          },
+          "id": "prt_d88135bca001YpE1abUx1ZraDI",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8813530e001HDDtQ6poBuqMmd"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "toolu_vrtx_01DRfg9zVULHYeiKwtzLccNW",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/package.json"
+            },
+            "output": "<path>/Users/savekirk/dev/ai/entire/session-bridge/package.json</path>\n<type>file</type>\n<content>\n1: {\n2:   \"name\": \"session-bridge\",\n3:   \"displayName\": \"Session Bridge\",\n4:   \"description\": \"Unofficial VSCode extension for inspecting and managing Entire sessions and checkpoints\",\n5:   \"version\": \"0.0.1\",\n6:   \"publisher\": \"kirk-agbenyegah\",\n7:   \"repository\": \"https://github.com/savekirk/session-bridge\",\n8:   \"engines\": {\n9:     \"vscode\": \"^1.105.0\"\n10:   },\n11:   \"categories\": [\n12:     \"Other\"\n13:   ],\n14:   \"activationEvents\": [\n15:     \"workspaceContains:**/*\"\n16:   ],\n17:   \"main\": \"./dist/extension.js\",\n18:   \"contributes\": {\n19:     \"viewsContainers\": {\n20:       \"activitybar\": [\n21:         {\n22:           \"id\": \"session-bridge\",\n23:           \"title\": \"Session Bridge for Entire\",\n24:           \"icon\": \"media/logo.svg\"\n25:         }\n26:       ]\n27:     },\n28:     \"views\": {\n29:       \"session-bridge\": [\n30:         {\n31:           \"id\": \"session.bridge.entire.checkpoints\",\n32:           \"name\": \"Checkpoints\",\n33:           \"icon\": \"media/dark/history.svg\"\n34:         },\n35:         {\n36:           \"id\": \"session.bridge.entire.sessions\",\n37:           \"name\": \"Checkpoint Sessions\",\n38:           \"icon\": \"media/dark/history.svg\"\n39:         }\n40:       ]\n41:     },\n42:     \"viewsWelcome\": [\n43:       {\n44:         \"view\": \"session.bridge.entire.checkpoints\",\n45:         \"when\": \"gitOpenRepositoryCount == 0\",\n46:         \"contents\": \"Open a Git repository to view Entire checkpoints.\\n[Open Folder](command:vscode.openFolder)\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n47:       },\n48:       {\n49:         \"view\": \"session.bridge.entire.checkpoints\",\n50:         \"when\": \"gitOpenRepositoryCount != 0 && session.bridge.state.cli-missing\",\n51:         \"contents\": \"The Entire CLI is not available in the extension host environment.\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n52:       },\n53:       {\n54:         \"view\": \"session.bridge.entire.checkpoints\",\n55:         \"when\": \"gitOpenRepositoryCount != 0 && session.bridge.state.not-git-repo\",\n56:         \"contents\": \"Entire features require a Git repository.\\n[Open Folder](command:vscode.openFolder)\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n57:       },\n58:       {\n59:         \"view\": \"session.bridge.entire.checkpoints\",\n60:         \"when\": \"gitOpenRepositoryCount != 0 && session.bridge.state.disabled\",\n61:         \"contents\": \"Entire is not enabled for this repository.\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n62:       },\n63:       {\n64:         \"view\": \"session.bridge.entire.sessions\",\n65:         \"when\": \"session.bridge.state.not-git-repo\",\n66:         \"contents\": \"Open a Git repository to see checkpoint sessions.\"\n67:       },\n68:       {\n69:         \"view\": \"session.bridge.entire.sessions\",\n70:         \"when\": \"session.bridge.state.cli-missing\",\n71:         \"contents\": \"Checkpoint sessions will appear here after Entire is installed and enabled.\"\n72:       },\n73:       {\n74:         \"view\": \"session.bridge.entire.sessions\",\n75:         \"when\": \"session.bridge.state.disabled\",\n76:         \"contents\": \"Checkpoint sessions will appear here after Entire is enabled.\"\n77:       },\n78:       {\n79:         \"view\": \"session.bridge.entire.sessions\",\n80:         \"when\": \"session.bridge.state.enabled\",\n81:         \"contents\": \"Select a checkpoint to inspect only the sessions captured in that checkpoint.\\n[Refresh session state](command:session.bridge.entire.refresh)\"\n82:       },\n83:       {\n84:         \"view\": \"session.bridge.entire.checkpoints\",\n85:         \"when\": \"session.bridge.state.enabled\",\n86:         \"contents\": \"No checkpoints on this branch.\\n[Refresh checkpoint state](command:session.bridge.entire.refresh)\"\n87:       }\n88:     ],\n89:     \"commands\": [\n90:       {\n91:         \"command\": \"session.bridge.entire.showStatus\",\n92:         \"title\": \"Show Status\",\n93:         \"category\": \"Session Bridge (Entire)\"\n94:       },\n95:       {\n96:         \"command\": \"session.bridge.entire.enable\",\n97:         \"title\": \"Enable In Repository\",\n98:         \"category\": \"Session Bridge (Entire)\"\n99:       },\n100:       {\n101:         \"command\": \"session.bridge.entire.disable\",\n102:         \"title\": \"Disable In Repository\",\n103:         \"category\": \"Session Bridge (Entire)\"\n104:       },\n105:       {\n106:         \"command\": \"session.bridge.entire.refresh\",\n107:         \"title\": \"Refresh\",\n108:         \"category\": \"Session Bridge (Entire)\"\n109:       },\n110:       {\n111:         \"command\": \"session.bridge.entire.fetchCheckpointBranch\",\n112:         \"title\": \"Fetch Checkpoint Branch\",\n113:         \"category\": \"Session Bridge (Entire)\"\n114:       },\n115:       {\n116:         \"command\": \"session.bridge.entire.browseCheckpoints\",\n117:         \"title\": \"Browse Checkpoints\",\n118:         \"category\": \"Session Bridge (Entire)\"\n119:       },\n120:       {\n121:         \"command\": \"session.bridge.entire.clean\",\n122:         \"title\": \"Clean Entire State\",\n123:         \"category\": \"Session Bridge (Entire)\"\n124:       },\n125:       {\n126:         \"command\": \"session.bridge.entire.reset\",\n127:         \"title\": \"Reset Entire Session Data\",\n128:         \"category\": \"Session Bridge (Entire)\"\n129:       },\n130:       {\n131:         \"command\": \"session.bridge.entire.showTrace\",\n132:         \"title\": \"Show Trace\",\n133:         \"category\": \"Session Bridge (Entire)\"\n134:       }\n135:     ],\n136:     \"menus\": {\n137:       \"view/title\": [\n138:         {\n139:           \"command\": \"session.bridge.entire.refresh\",\n140:           \"when\": \"view =~ /^session\\\\.bridge\\\\.entire\\\\./\",\n141:           \"group\": \"navigation\"\n142:         }\n143:       ]\n144:     }\n145:   },\n146:   \"scripts\": {\n147:     \"vscode:prepublish\": \"pnpm run package\",\n148:     \"compile\": \"pnpm run check-types && pnpm run lint && node esbuild.js\",\n149:     \"watch\": \"npm-run-all -p watch:*\",\n150:     \"watch:esbuild\": \"node esbuild.js --watch\",\n151:     \"watch:tsc\": \"tsc --noEmit --watch --project tsconfig.json\",\n152:     \"package\": \"pnpm run check-types && pnpm run lint && node esbuild.js --production\",\n153:     \"compile-tests\": \"node -e \\\"require('node:fs').rmSync('out', { recursive: true, force: true })\\\" && tsc -p . --outDir out\",\n154:     \"watch-tests\": \"tsc -p . -w --outDir out\",\n155:     \"pretest\": \"pnpm run compile-tests && pnpm run compile && pnpm run lint\",\n156:     \"check-types\": \"tsc --noEmit\",\n157:     \"lint\": \"eslint src\",\n158:     \"test\": \"vscode-test\"\n159:   },\n160:   \"devDependencies\": {\n161:     \"@types/vscode\": \"1.105.0\",\n162:     \"@types/mocha\": \"^10.0.10\",\n163:     \"@types/node\": \"22.x\",\n164:     \"typescript-eslint\": \"^8.56.1\",\n165:     \"eslint\": \"^9.39.3\",\n166:     \"esbuild\": \"^0.27.3\",\n167:     \"npm-run-all\": \"^4.1.5\",\n168:     \"typescript\": \"^5.9.3\",\n169:     \"@vscode/test-cli\": \"^0.0.12\",\n170:     \"@vscode/test-electron\": \"^2.5.2\"\n171:   }\n172: }\n\n(End of file - total 172 lines)\n</content>",
+            "metadata": {
+              "preview": "{\n  \"name\": \"session-bridge\",\n  \"displayName\": \"Session Bridge\",\n  \"description\": \"Unofficial VSCode extension for inspecting and managing Entire sessions and checkpoints\",\n  \"version\": \"0.0.1\",\n  \"publisher\": \"kirk-agbenyegah\",\n  \"repository\": \"https://github.com/savekirk/session-bridge\",\n  \"engines\": {\n    \"vscode\": \"^1.105.0\"\n  },\n  \"categories\": [\n    \"Other\"\n  ],\n  \"activationEvents\": [\n    \"workspaceContains:**/*\"\n  ],\n  \"main\": \"./dist/extension.js\",\n  \"contributes\": {\n    \"viewsContainers\": {\n      \"activitybar\": [",
+              "truncated": false,
+              "loaded": []
+            },
+            "title": "package.json",
+            "time": {
+              "start": 1776104469788,
+              "end": 1776104469794
+            }
+          },
+          "id": "prt_d88136d35001yDY0jTGaOovbVO",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8813530e001HDDtQ6poBuqMmd"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "type": "step-finish",
+          "tokens": {
+            "total": 26369,
+            "input": 10757,
+            "output": 225,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 15387
+            }
+          },
+          "cost": 0,
+          "id": "prt_d88137534001827D6jxQR0qoLL",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8813530e001HDDtQ6poBuqMmd"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 28961,
+          "input": 2552,
+          "output": 271,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 26138
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104469864,
+          "completed": 1776104509184
+        },
+        "finish": "tool-calls",
+        "id": "msg_d88137568001bc8ZazsDW6lHCb",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "type": "step-start",
+          "id": "prt_d8813802c001LSq6rNqBT0wwRF",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88137568001bc8ZazsDW6lHCb"
+        },
+        {
+          "type": "text",
+          "text": "Perfect! I can see that the view container is `session-bridge` (line 22) and it contains two views:\n- `session.bridge.entire.checkpoints` (Checkpoints)\n- `session.bridge.entire.sessions` (Checkpoint Sessions)\n\nThe existing `BROWSE_CHECKPOINTS` command focuses the checkpoints view (line 455 in extension.ts). I'll modify the status bar to focus the Session Bridge view container instead of showing CLI status.\n\nLet me update the code:",
+          "time": {
+            "start": 1776104472623,
+            "end": 1776104478035
+          },
+          "id": "prt_d8813802f00141VpUo578f7E7i",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88137568001bc8ZazsDW6lHCb"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "toolu_vrtx_016uKNRBx7rCE7CqjVxixrzX",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts",
+              "oldString": "  tooltip.appendMarkdown(\"\\n\\n_Click to show Entire status._\");\n\n  return tooltip;",
+              "newString": "  tooltip.appendMarkdown(\"\\n\\n_Click to open Session Bridge view._\");\n\n  return tooltip;"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts\n@@ -112,9 +112,9 @@\n       tooltip.appendText(warning);\n     }\n   }\n \n-  tooltip.appendMarkdown(\"\\n\\n_Click to show Entire status._\");\n+  tooltip.appendMarkdown(\"\\n\\n_Click to open Session Bridge view._\");\n \n   return tooltip;\n }\n \n",
+              "filediff": {
+                "file": "/Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts",
+                "patch": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts\n@@ -112,9 +112,9 @@\n       tooltip.appendText(warning);\n     }\n   }\n \n-  tooltip.appendMarkdown(\"\\n\\n_Click to show Entire status._\");\n+  tooltip.appendMarkdown(\"\\n\\n_Click to open Session Bridge view._\");\n \n   return tooltip;\n }\n \n",
+                "additions": 1,
+                "deletions": 1
+              },
+              "truncated": false
+            },
+            "title": "src/components/entireStatusBarItem.ts",
+            "time": {
+              "start": 1776104478031,
+              "end": 1776104509110
+            }
+          },
+          "id": "prt_d88138c4e0016TF9jhwclZYsIj",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88137568001bc8ZazsDW6lHCb"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "7eac7e74a75b2701fcbc86a47ae25d065041f7ff",
+          "type": "step-finish",
+          "tokens": {
+            "total": 28961,
+            "input": 2552,
+            "output": 271,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 26138
+            }
+          },
+          "cost": 0,
+          "id": "prt_d88140eb7001KZdngtgz2D4tsJ",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88137568001bc8ZazsDW6lHCb"
+        },
+        {
+          "type": "patch",
+          "hash": "0cc8c24b6ca4f354b5b70a08a4c07acce71e6707",
+          "files": [
+            "/Users/savekirk/dev/ai/entire/session-bridge/src/components/entireStatusBarItem.ts"
+          ],
+          "id": "prt_d88140eff00125WHQBHl2yg7Pj",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88137568001bc8ZazsDW6lHCb"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 30132,
+          "input": 290,
+          "output": 1156,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 28686
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104509185,
+          "completed": 1776104525887
+        },
+        "finish": "tool-calls",
+        "id": "msg_d88140f01001DRiDohmcBvZL9z",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "7eac7e74a75b2701fcbc86a47ae25d065041f7ff",
+          "type": "step-start",
+          "id": "prt_d881418710010h56dGAWHD5yLz",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88140f01001DRiDohmcBvZL9z"
+        },
+        {
+          "type": "text",
+          "text": "Now I need to add a new command to focus the view container and update the extension to use this command instead of SHOW_STATUS:",
+          "time": {
+            "start": 1776104511602,
+            "end": 1776104522809
+          },
+          "id": "prt_d88141872001pdrpc0dsGoXiTC",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88140f01001DRiDohmcBvZL9z"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "toolu_vrtx_01Uvtwhivf7WPooDs8JedPQw",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "oldString": "const enum COMMAND_ID {\n\tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n\tENABLE = \"session.bridge.entire.enable\",\n\tDISABLE = \"session.bridge.entire.disable\",\n\tREFRESH = \"session.bridge.entire.refresh\",\n\tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n\tBROWSE_CHECKPOINTS = \"session.bridge.entire.browseCheckpoints\",\n\tOPEN_COMMIT_CHANGES = \"session.bridge.entire.openCommitChanges\",\n\tOPEN_SESSION_TRANSCRIPT = \"session.bridge.entire.openSessionTranscript\",\n\tCLEAN = \"session.bridge.entire.clean\",\n\tRESET = \"session.bridge.entire.reset\",\n\tSHOW_TRACE = \"session.bridge.entire.showTrace\"\n}",
+              "newString": "const enum COMMAND_ID {\n\tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n\tFOCUS_VIEW = \"session.bridge.entire.focusView\",\n\tENABLE = \"session.bridge.entire.enable\",\n\tDISABLE = \"session.bridge.entire.disable\",\n\tREFRESH = \"session.bridge.entire.refresh\",\n\tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n\tBROWSE_CHECKPOINTS = \"session.bridge.entire.browseCheckpoints\",\n\tOPEN_COMMIT_CHANGES = \"session.bridge.entire.openCommitChanges\",\n\tOPEN_SESSION_TRANSCRIPT = \"session.bridge.entire.openSessionTranscript\",\n\tCLEAN = \"session.bridge.entire.clean\",\n\tRESET = \"session.bridge.entire.reset\",\n\tSHOW_TRACE = \"session.bridge.entire.showTrace\"\n}"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -16,8 +16,9 @@\n const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';\n const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';\n const enum COMMAND_ID {\n \tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n+\tFOCUS_VIEW = \"session.bridge.entire.focusView\",\n \tENABLE = \"session.bridge.entire.enable\",\n \tDISABLE = \"session.bridge.entire.disable\",\n \tREFRESH = \"session.bridge.entire.refresh\",\n \tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n",
+              "filediff": {
+                "file": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+                "patch": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -16,8 +16,9 @@\n const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';\n const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';\n const enum COMMAND_ID {\n \tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n+\tFOCUS_VIEW = \"session.bridge.entire.focusView\",\n \tENABLE = \"session.bridge.entire.enable\",\n \tDISABLE = \"session.bridge.entire.disable\",\n \tREFRESH = \"session.bridge.entire.refresh\",\n \tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n",
+                "additions": 1,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104517876,
+              "end": 1776104520879
+            }
+          },
+          "id": "prt_d88141e0f001UzHVgwm9HLdynO",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88140f01001DRiDohmcBvZL9z"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "toolu_vrtx_01NBpUcyJaTWHX6dKCDChkAw",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "oldString": "const COMMAND_TITLES: Record<COMMAND_ID, string> = {\n\t[COMMAND_ID.SHOW_STATUS]: 'Show Status',\n\t[COMMAND_ID.ENABLE]: 'Enable In Repository',\n\t[COMMAND_ID.DISABLE]: 'Disable In Repository',\n\t[COMMAND_ID.REFRESH]: 'Refresh',\n\t[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',\n\t[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',\n\t[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',\n\t[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',\n\t[COMMAND_ID.CLEAN]: 'Clean Entire State',\n\t[COMMAND_ID.RESET]: 'Reset Entire Session Data',\n\t[COMMAND_ID.SHOW_TRACE]: 'Show Trace'\n};",
+              "newString": "const COMMAND_TITLES: Record<COMMAND_ID, string> = {\n\t[COMMAND_ID.SHOW_STATUS]: 'Show Status',\n\t[COMMAND_ID.FOCUS_VIEW]: 'Focus View',\n\t[COMMAND_ID.ENABLE]: 'Enable In Repository',\n\t[COMMAND_ID.DISABLE]: 'Disable In Repository',\n\t[COMMAND_ID.REFRESH]: 'Refresh',\n\t[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',\n\t[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',\n\t[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',\n\t[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',\n\t[COMMAND_ID.CLEAN]: 'Clean Entire State',\n\t[COMMAND_ID.RESET]: 'Reset Entire Session Data',\n\t[COMMAND_ID.SHOW_TRACE]: 'Show Trace'\n};"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -36,8 +36,9 @@\n ] as const;\n \n const COMMAND_TITLES: Record<COMMAND_ID, string> = {\n \t[COMMAND_ID.SHOW_STATUS]: 'Show Status',\n+\t[COMMAND_ID.FOCUS_VIEW]: 'Focus View',\n \t[COMMAND_ID.ENABLE]: 'Enable In Repository',\n \t[COMMAND_ID.DISABLE]: 'Disable In Repository',\n \t[COMMAND_ID.REFRESH]: 'Refresh',\n \t[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',\n",
+              "filediff": {
+                "file": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+                "patch": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -36,8 +36,9 @@\n ] as const;\n \n const COMMAND_TITLES: Record<COMMAND_ID, string> = {\n \t[COMMAND_ID.SHOW_STATUS]: 'Show Status',\n+\t[COMMAND_ID.FOCUS_VIEW]: 'Focus View',\n \t[COMMAND_ID.ENABLE]: 'Enable In Repository',\n \t[COMMAND_ID.DISABLE]: 'Disable In Repository',\n \t[COMMAND_ID.REFRESH]: 'Refresh',\n \t[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',\n",
+                "additions": 1,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104522812,
+              "end": 1776104525815
+            }
+          },
+          "id": "prt_d88143126001xwbiGkfItLrh6P",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88140f01001DRiDohmcBvZL9z"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "cfd8e5e13cfcb5a21cbf9f238d7eda79bf519695",
+          "type": "step-finish",
+          "tokens": {
+            "total": 30132,
+            "input": 290,
+            "output": 1156,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 28686
+            }
+          },
+          "cost": 0,
+          "id": "prt_d88144ff9001OmvD4qjjmFNmcN",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88140f01001DRiDohmcBvZL9z"
+        },
+        {
+          "type": "patch",
+          "hash": "7eac7e74a75b2701fcbc86a47ae25d065041f7ff",
+          "files": [
+            "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts"
+          ],
+          "id": "prt_d8814503d001Pbu4KVP3R3a0VK",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88140f01001DRiDohmcBvZL9z"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 30908,
+          "input": 1224,
+          "output": 711,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 28973
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104525888,
+          "completed": 1776104539233
+        },
+        "finish": "tool-calls",
+        "id": "msg_d88145040001VlJ6mBiDqQZ8Tr",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "cfd8e5e13cfcb5a21cbf9f238d7eda79bf519695",
+          "type": "step-start",
+          "id": "prt_d88145b020016KPw0QblEeNWAO",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88145040001VlJ6mBiDqQZ8Tr"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "toolu_vrtx_01WfMqNXGovqRqSDytvD6Vrr",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "newString": "\tconst initialProbeTarget = await resolveProbeTargetPath();\n\tlet workspaceState = await probeEntireWorkspace(initialProbeTarget);\n\tawait setWorkspaceContext(workspaceState.state);\n\tconst statusBarItem = createStatusBarItem(COMMAND_ID.FOCUS_VIEW, workspaceState);\n\tif (vscode.workspace.workspaceFolders?.length) {\n\t\tstatusBarItem.show();\n\t\tcontext.subscriptions.push(statusBarItem);\n\t}",
+              "oldString": "\tconst initialProbeTarget = await resolveProbeTargetPath();\n\tlet workspaceState = await probeEntireWorkspace(initialProbeTarget);\n\tawait setWorkspaceContext(workspaceState.state);\n\tconst statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);\n\tif (vscode.workspace.workspaceFolders?.length) {\n\t\tstatusBarItem.show();\n\t\tcontext.subscriptions.push(statusBarItem);\n\t}"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -92,9 +92,9 @@\n \n const initialProbeTarget = await resolveProbeTargetPath();\n let workspaceState = await probeEntireWorkspace(initialProbeTarget);\n await setWorkspaceContext(workspaceState.state);\n-const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);\n+const statusBarItem = createStatusBarItem(COMMAND_ID.FOCUS_VIEW, workspaceState);\n if (vscode.workspace.workspaceFolders?.length) {\n \tstatusBarItem.show();\n \tcontext.subscriptions.push(statusBarItem);\n }\n",
+              "filediff": {
+                "file": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+                "patch": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -92,9 +92,9 @@\n \n const initialProbeTarget = await resolveProbeTargetPath();\n let workspaceState = await probeEntireWorkspace(initialProbeTarget);\n await setWorkspaceContext(workspaceState.state);\n-const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);\n+const statusBarItem = createStatusBarItem(COMMAND_ID.FOCUS_VIEW, workspaceState);\n if (vscode.workspace.workspaceFolders?.length) {\n \tstatusBarItem.show();\n \tcontext.subscriptions.push(statusBarItem);\n }\n",
+                "additions": 1,
+                "deletions": 1
+              },
+              "truncated": false
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104533927,
+              "end": 1776104536932
+            }
+          },
+          "id": "prt_d88145b03002XiD6KtF0l3jVRy",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88145040001VlJ6mBiDqQZ8Tr"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "toolu_vrtx_01ShJZda2KgPj3waHns7KPky",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "newString": "\t\tworkspaceState = await probeEntireWorkspace(cwd);\n\t\tawait setWorkspaceContext(workspaceState.state);\n\t\tawait updateProbeWatchers(cwd);\n\t\tupdateStatusBarItem(statusBarItem, COMMAND_ID.FOCUS_VIEW, workspaceState);\n\t\tcheckpointSessionsProvider.setWorkspaceState(workspaceState, cwd);\n\t\tcheckpointSessionsProvider.refresh();\n\t\tcheckpointProvider.setWorkspaceState(workspaceState, cwd);\n\t\tcheckpointProvider.refresh();",
+              "oldString": "\t\tworkspaceState = await probeEntireWorkspace(cwd);\n\t\tawait setWorkspaceContext(workspaceState.state);\n\t\tawait updateProbeWatchers(cwd);\n\t\tupdateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);\n\t\tcheckpointSessionsProvider.setWorkspaceState(workspaceState, cwd);\n\t\tcheckpointSessionsProvider.refresh();\n\t\tcheckpointProvider.setWorkspaceState(workspaceState, cwd);\n\t\tcheckpointProvider.refresh();"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -288,9 +288,9 @@\n }\n workspaceState = await probeEntireWorkspace(cwd);\n await setWorkspaceContext(workspaceState.state);\n await updateProbeWatchers(cwd);\n-updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);\n+updateStatusBarItem(statusBarItem, COMMAND_ID.FOCUS_VIEW, workspaceState);\n checkpointSessionsProvider.setWorkspaceState(workspaceState, cwd);\n checkpointSessionsProvider.refresh();\n checkpointProvider.setWorkspaceState(workspaceState, cwd);\n checkpointProvider.refresh();\n",
+              "filediff": {
+                "file": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+                "patch": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -288,9 +288,9 @@\n }\n workspaceState = await probeEntireWorkspace(cwd);\n await setWorkspaceContext(workspaceState.state);\n await updateProbeWatchers(cwd);\n-updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);\n+updateStatusBarItem(statusBarItem, COMMAND_ID.FOCUS_VIEW, workspaceState);\n checkpointSessionsProvider.setWorkspaceState(workspaceState, cwd);\n checkpointSessionsProvider.refresh();\n checkpointProvider.setWorkspaceState(workspaceState, cwd);\n checkpointProvider.refresh();\n",
+                "additions": 1,
+                "deletions": 1
+              },
+              "truncated": false
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104536159,
+              "end": 1776104539162
+            }
+          },
+          "id": "prt_d88146fc3001RNLO6vMLfMzbnI",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88145040001VlJ6mBiDqQZ8Tr"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "600f442463c9f1b95de1750afa5a9e365be495da",
+          "type": "step-finish",
+          "tokens": {
+            "total": 30908,
+            "input": 1224,
+            "output": 711,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 28973
+            }
+          },
+          "cost": 0,
+          "id": "prt_d8814841b0016jCPoE69DkIh34",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88145040001VlJ6mBiDqQZ8Tr"
+        },
+        {
+          "type": "patch",
+          "hash": "cfd8e5e13cfcb5a21cbf9f238d7eda79bf519695",
+          "files": [
+            "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts"
+          ],
+          "id": "prt_d88148460001b7wV0FcA9c61CL",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d88145040001VlJ6mBiDqQZ8Tr"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 31237,
+          "input": 780,
+          "output": 264,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 30193
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104539234,
+          "completed": 1776104547274
+        },
+        "finish": "tool-calls",
+        "id": "msg_d881484620015Y2ZvBcb10zeX5",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "600f442463c9f1b95de1750afa5a9e365be495da",
+          "type": "step-start",
+          "id": "prt_d88148c110011HOlk2kBDF44qB",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881484620015Y2ZvBcb10zeX5"
+        },
+        {
+          "type": "text",
+          "text": "Now I need to add the handler for the FOCUS_VIEW command in the command registration section:",
+          "time": {
+            "start": 1776104541202,
+            "end": 1776104544198
+          },
+          "id": "prt_d88148c12001yCm0mvD17c23SS",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881484620015Y2ZvBcb10zeX5"
+        },
+        {
+          "type": "tool",
+          "tool": "edit",
+          "callID": "toolu_vrtx_01Qa9z759wBFvqXvsYgqtDni",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "newString": "\t\t\t\tcase COMMAND_ID.SHOW_STATUS: {\n\t\t\t\t\tawait showStatus();\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t\tcase COMMAND_ID.FOCUS_VIEW: {\n\t\t\t\t\tappendCommandRun(commandId);\n\t\t\t\t\tawait vscode.commands.executeCommand('workbench.view.extension.session-bridge');\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t\tdefault:\n\t\t\t\t\tawait showPlaceholder(commandId);",
+              "oldString": "\t\t\t\tcase COMMAND_ID.SHOW_STATUS: {\n\t\t\t\t\tawait showStatus();\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t\tdefault:\n\t\t\t\t\tawait showPlaceholder(commandId);"
+            },
+            "output": "Edit applied successfully.",
+            "metadata": {
+              "diagnostics": {},
+              "diff": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -469,8 +469,13 @@\n \t\tcase COMMAND_ID.SHOW_STATUS: {\n \t\t\tawait showStatus();\n \t\t\tbreak;\n \t\t}\n+\t\tcase COMMAND_ID.FOCUS_VIEW: {\n+\t\t\tappendCommandRun(commandId);\n+\t\t\tawait vscode.commands.executeCommand('workbench.view.extension.session-bridge');\n+\t\t\tbreak;\n+\t\t}\n \t\tdefault:\n \t\t\tawait showPlaceholder(commandId);\n \t}\n });\n",
+              "filediff": {
+                "file": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+                "patch": "Index: /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n===================================================================\n--- /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n+++ /Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts\n@@ -469,8 +469,13 @@\n \t\tcase COMMAND_ID.SHOW_STATUS: {\n \t\t\tawait showStatus();\n \t\t\tbreak;\n \t\t}\n+\t\tcase COMMAND_ID.FOCUS_VIEW: {\n+\t\t\tappendCommandRun(commandId);\n+\t\t\tawait vscode.commands.executeCommand('workbench.view.extension.session-bridge');\n+\t\t\tbreak;\n+\t\t}\n \t\tdefault:\n \t\t\tawait showPlaceholder(commandId);\n \t}\n });\n",
+                "additions": 5,
+                "deletions": 0
+              },
+              "truncated": false
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104544203,
+              "end": 1776104547206
+            }
+          },
+          "id": "prt_d88148e0f001NW5gOX0Ve89OcW",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881484620015Y2ZvBcb10zeX5"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "bff6fcd240fe26a5c2a03af106780d9c4b4d22fe",
+          "type": "step-finish",
+          "tokens": {
+            "total": 31237,
+            "input": 780,
+            "output": 264,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 30193
+            }
+          },
+          "cost": 0,
+          "id": "prt_d8814a387002y1pDLADCKG2P6f",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881484620015Y2ZvBcb10zeX5"
+        },
+        {
+          "type": "patch",
+          "hash": "600f442463c9f1b95de1750afa5a9e365be495da",
+          "files": [
+            "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts"
+          ],
+          "id": "prt_d8814a3c9001RYHpO6wGciipw5",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d881484620015Y2ZvBcb10zeX5"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 31554,
+          "input": 283,
+          "output": 302,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 30969
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104547275,
+          "completed": 1776104551677
+        },
+        "finish": "tool-calls",
+        "id": "msg_d8814a3cb001IsLdy7DcBe5lhV",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "bff6fcd240fe26a5c2a03af106780d9c4b4d22fe",
+          "type": "step-start",
+          "id": "prt_d8814aab00010OREPMBD5XmIA4",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814a3cb001IsLdy7DcBe5lhV"
+        },
+        {
+          "type": "text",
+          "text": "Perfect! Now let me verify the changes by reading the modified sections:",
+          "time": {
+            "start": 1776104549042,
+            "end": 1776104551622
+          },
+          "id": "prt_d8814aab2001PXr6mQ8AtEi0Oo",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814a3cb001IsLdy7DcBe5lhV"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "toolu_vrtx_01DjNR6MZAoh3Pe7DMPLXjPv",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "offset": 18,
+              "limit": 50
+            },
+            "output": "<path>/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts</path>\n<type>file</type>\n<content>\n18: const enum COMMAND_ID {\n19: \tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n20: \tFOCUS_VIEW = \"session.bridge.entire.focusView\",\n21: \tENABLE = \"session.bridge.entire.enable\",\n22: \tDISABLE = \"session.bridge.entire.disable\",\n23: \tREFRESH = \"session.bridge.entire.refresh\",\n24: \tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n25: \tBROWSE_CHECKPOINTS = \"session.bridge.entire.browseCheckpoints\",\n26: \tOPEN_COMMIT_CHANGES = \"session.bridge.entire.openCommitChanges\",\n27: \tOPEN_SESSION_TRANSCRIPT = \"session.bridge.entire.openSessionTranscript\",\n28: \tCLEAN = \"session.bridge.entire.clean\",\n29: \tRESET = \"session.bridge.entire.reset\",\n30: \tSHOW_TRACE = \"session.bridge.entire.showTrace\"\n31: }\n32: \n33: const TREE_VIEW_IDS = [\n34: \tSESSIONS_VIEW_ID,\n35: \tCHECKPOINTS_VIEW_ID,\n36: ] as const;\n37: \n38: const COMMAND_TITLES: Record<COMMAND_ID, string> = {\n39: \t[COMMAND_ID.SHOW_STATUS]: 'Show Status',\n40: \t[COMMAND_ID.FOCUS_VIEW]: 'Focus View',\n41: \t[COMMAND_ID.ENABLE]: 'Enable In Repository',\n42: \t[COMMAND_ID.DISABLE]: 'Disable In Repository',\n43: \t[COMMAND_ID.REFRESH]: 'Refresh',\n44: \t[COMMAND_ID.FETCH_CHECKPOINT_BRANCH]: 'Fetch Checkpoint Branch',\n45: \t[COMMAND_ID.BROWSE_CHECKPOINTS]: 'Browse Checkpoints',\n46: \t[COMMAND_ID.OPEN_COMMIT_CHANGES]: 'Open Commit Changes',\n47: \t[COMMAND_ID.OPEN_SESSION_TRANSCRIPT]: 'Open Session Transcript',\n48: \t[COMMAND_ID.CLEAN]: 'Clean Entire State',\n49: \t[COMMAND_ID.RESET]: 'Reset Entire Session Data',\n50: \t[COMMAND_ID.SHOW_TRACE]: 'Show Trace'\n51: };\n52: \n53: \n54: const WORKSPACE_CONTEXT: [EntireStatusState, string][] = [\n55: \t[EntireStatusState.CLI_MISSING, 'session.bridge.state.cli-missing'],\n56: \t[EntireStatusState.DISABLED, 'session.bridge.state.disabled'],\n57: \t[EntireStatusState.ENABLED, 'session.bridge.state.enabled'],\n58: \t[EntireStatusState.NOT_GIT_REPO, 'session.bridge.state.not-git-repo']\n59: ];\n60: \n61: interface GitApi {\n62: \tgetRepository(uri: vscode.Uri): GitRepository | null;\n63: \topenRepository(uri: vscode.Uri): Promise<GitRepository | null>;\n64: }\n65: \n66: interface GitRepository {\n67: \treadonly rootUri: vscode.Uri;\n\n(Showing lines 18-67 of 616. Use offset=68 to continue.)\n</content>",
+            "metadata": {
+              "preview": "const enum COMMAND_ID {\n\tSHOW_STATUS = \"session.bridge.entire.showStatus\",\n\tFOCUS_VIEW = \"session.bridge.entire.focusView\",\n\tENABLE = \"session.bridge.entire.enable\",\n\tDISABLE = \"session.bridge.entire.disable\",\n\tREFRESH = \"session.bridge.entire.refresh\",\n\tFETCH_CHECKPOINT_BRANCH = \"session.bridge.entire.fetchCheckpointBranch\",\n\tBROWSE_CHECKPOINTS = \"session.bridge.entire.browseCheckpoints\",\n\tOPEN_COMMIT_CHANGES = \"session.bridge.entire.openCommitChanges\",\n\tOPEN_SESSION_TRANSCRIPT = \"session.bridge.entire.openSessionTranscript\",\n\tCLEAN = \"session.bridge.entire.clean\",\n\tRESET = \"session.bridge.entire.reset\",\n\tSHOW_TRACE = \"session.bridge.entire.showTrace\"\n}\n\nconst TREE_VIEW_IDS = [\n\tSESSIONS_VIEW_ID,\n\tCHECKPOINTS_VIEW_ID,\n] as const;\n",
+              "truncated": true,
+              "loaded": []
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104550289,
+              "end": 1776104550293
+            }
+          },
+          "id": "prt_d8814ae91001trmKZgFtTCu8fm",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814a3cb001IsLdy7DcBe5lhV"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "toolu_vrtx_0182EJXQNo1gRhcL7z8CdVvT",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "offset": 91,
+              "limit": 10
+            },
+            "output": "<path>/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts</path>\n<type>file</type>\n<content>\n91: \tcontext.subscriptions.push(outputChannel);\n92: \n93: \tconst initialProbeTarget = await resolveProbeTargetPath();\n94: \tlet workspaceState = await probeEntireWorkspace(initialProbeTarget);\n95: \tawait setWorkspaceContext(workspaceState.state);\n96: \tconst statusBarItem = createStatusBarItem(COMMAND_ID.FOCUS_VIEW, workspaceState);\n97: \tif (vscode.workspace.workspaceFolders?.length) {\n98: \t\tstatusBarItem.show();\n99: \t\tcontext.subscriptions.push(statusBarItem);\n100: \t}\n\n(Showing lines 91-100 of 616. Use offset=101 to continue.)\n</content>",
+            "metadata": {
+              "preview": "\tcontext.subscriptions.push(outputChannel);\n\n\tconst initialProbeTarget = await resolveProbeTargetPath();\n\tlet workspaceState = await probeEntireWorkspace(initialProbeTarget);\n\tawait setWorkspaceContext(workspaceState.state);\n\tconst statusBarItem = createStatusBarItem(COMMAND_ID.FOCUS_VIEW, workspaceState);\n\tif (vscode.workspace.workspaceFolders?.length) {\n\t\tstatusBarItem.show();\n\t\tcontext.subscriptions.push(statusBarItem);\n\t}",
+              "truncated": true,
+              "loaded": []
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104551111,
+              "end": 1776104551115
+            }
+          },
+          "id": "prt_d8814af920019LIpqDcsYToJmy",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814a3cb001IsLdy7DcBe5lhV"
+        },
+        {
+          "type": "tool",
+          "tool": "read",
+          "callID": "toolu_vrtx_018c9g3VfYnVgZT4G7jnCVRd",
+          "state": {
+            "status": "completed",
+            "input": {
+              "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts",
+              "offset": 467,
+              "limit": 15
+            },
+            "output": "<path>/Users/savekirk/dev/ai/entire/session-bridge/src/extension.ts</path>\n<type>file</type>\n<content>\n467: \t\t\t\t\treturn;\n468: \t\t\t\t}\n469: \t\t\t\tcase COMMAND_ID.SHOW_STATUS: {\n470: \t\t\t\t\tawait showStatus();\n471: \t\t\t\t\tbreak;\n472: \t\t\t\t}\n473: \t\t\t\tcase COMMAND_ID.FOCUS_VIEW: {\n474: \t\t\t\t\tappendCommandRun(commandId);\n475: \t\t\t\t\tawait vscode.commands.executeCommand('workbench.view.extension.session-bridge');\n476: \t\t\t\t\tbreak;\n477: \t\t\t\t}\n478: \t\t\t\tdefault:\n479: \t\t\t\t\tawait showPlaceholder(commandId);\n480: \t\t\t}\n481: \t\t});\n\n(Showing lines 467-481 of 616. Use offset=482 to continue.)\n</content>",
+            "metadata": {
+              "preview": "\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\tcase COMMAND_ID.SHOW_STATUS: {\n\t\t\t\t\tawait showStatus();\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t\tcase COMMAND_ID.FOCUS_VIEW: {\n\t\t\t\t\tappendCommandRun(commandId);\n\t\t\t\t\tawait vscode.commands.executeCommand('workbench.view.extension.session-bridge');\n\t\t\t\t\tbreak;\n\t\t\t\t}\n\t\t\t\tdefault:\n\t\t\t\t\tawait showPlaceholder(commandId);\n\t\t\t}\n\t\t});",
+              "truncated": true,
+              "loaded": []
+            },
+            "title": "src/extension.ts",
+            "time": {
+              "start": 1776104551621,
+              "end": 1776104551625
+            }
+          },
+          "id": "prt_d8814b2c8001Cr5o9odXaRRHb0",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814a3cb001IsLdy7DcBe5lhV"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "bff6fcd240fe26a5c2a03af106780d9c4b4d22fe",
+          "type": "step-finish",
+          "tokens": {
+            "total": 31554,
+            "input": 283,
+            "output": 302,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 30969
+            }
+          },
+          "cost": 0,
+          "id": "prt_d8814b4ca001NjBRxHM6k2I3Nj",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814a3cb001IsLdy7DcBe5lhV"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33081,
+          "input": 1738,
+          "output": 93,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 31250
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104551678,
+          "completed": 1776104556385
+        },
+        "finish": "tool-calls",
+        "id": "msg_d8814b4fe0012s4usKVoXhRCHk",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "bff6fcd240fe26a5c2a03af106780d9c4b4d22fe",
+          "type": "step-start",
+          "id": "prt_d8814bbd1001Nj7lztwU4UKI3R",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814b4fe0012s4usKVoXhRCHk"
+        },
+        {
+          "type": "text",
+          "text": "Great! Now let's compile and test the changes:",
+          "time": {
+            "start": 1776104553426,
+            "end": 1776104554361
+          },
+          "id": "prt_d8814bbd2001acfxvmZKtqwQIW",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814b4fe0012s4usKVoXhRCHk"
+        },
+        {
+          "type": "tool",
+          "tool": "bash",
+          "callID": "toolu_vrtx_01REpD2ZTx6BFXyqZBGjfEvb",
+          "state": {
+            "status": "completed",
+            "input": {
+              "command": "pnpm compile",
+              "description": "Compile the extension with type-checking and linting"
+            },
+            "output": "\n> session-bridge@0.0.1 compile /Users/savekirk/dev/ai/entire/session-bridge\n> pnpm run check-types && pnpm run lint && node esbuild.js\n\n\n> session-bridge@0.0.1 check-types /Users/savekirk/dev/ai/entire/session-bridge\n> tsc --noEmit\n\n\n> session-bridge@0.0.1 lint /Users/savekirk/dev/ai/entire/session-bridge\n> eslint src\n\n[watch] build started\n[watch] build finished\n",
+            "metadata": {
+              "output": "\n> session-bridge@0.0.1 compile /Users/savekirk/dev/ai/entire/session-bridge\n> pnpm run check-types && pnpm run lint && node esbuild.js\n\n\n> session-bridge@0.0.1 check-types /Users/savekirk/dev/ai/entire/session-bridge\n> tsc --noEmit\n\n\n> session-bridge@0.0.1 lint /Users/savekirk/dev/ai/entire/session-bridge\n> eslint src\n\n[watch] build started\n[watch] build finished\n",
+              "exit": 0,
+              "description": "Compile the extension with type-checking and linting",
+              "truncated": false
+            },
+            "title": "Compile the extension with type-checking and linting",
+            "time": {
+              "start": 1776104556338,
+              "end": 1776104556344
+            }
+          },
+          "id": "prt_d8814bdef001HYOEo3eClZA8jy",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814b4fe0012s4usKVoXhRCHk"
+        },
+        {
+          "reason": "tool-calls",
+          "snapshot": "bff6fcd240fe26a5c2a03af106780d9c4b4d22fe",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33081,
+            "input": 1738,
+            "output": 93,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 31250
+            }
+          },
+          "cost": 0,
+          "id": "prt_d8814c73900103gkx65KVY5d1n",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814b4fe0012s4usKVoXhRCHk"
+        }
+      ]
+    },
+    {
+      "info": {
+        "parentID": "msg_d881330c00013c6i37Tfu8ZMan",
+        "role": "assistant",
+        "mode": "build",
+        "agent": "build",
+        "variant": "medium",
+        "path": {
+          "cwd": "/Users/savekirk/dev/ai/entire/session-bridge",
+          "root": "/Users/savekirk/dev/ai/entire/session-bridge"
+        },
+        "cost": 0,
+        "tokens": {
+          "total": 33615,
+          "input": 245,
+          "output": 385,
+          "reasoning": 0,
+          "cache": {
+            "write": 0,
+            "read": 32985
+          }
+        },
+        "modelID": "claude-sonnet-4.5",
+        "providerID": "github-copilot",
+        "time": {
+          "created": 1776104556386,
+          "completed": 1776104566021
+        },
+        "finish": "stop",
+        "id": "msg_d8814c762001bFro0wlEXS5eaO",
+        "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU"
+      },
+      "parts": [
+        {
+          "snapshot": "bff6fcd240fe26a5c2a03af106780d9c4b4d22fe",
+          "type": "step-start",
+          "id": "prt_d8814ce09001Q5FsrTZp323VIo",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814c762001bFro0wlEXS5eaO"
+        },
+        {
+          "type": "text",
+          "text": "Excellent! The compilation was successful. Now let me create a summary of the changes:\n\n## Summary\n\nI've successfully modified the Session Bridge extension so that clicking on the status bar item now opens the Session Bridge view container instead of showing the CLI status output.\n\n### Changes Made:\n\n1. **`src/components/entireStatusBarItem.ts`** (line 116):\n   - Updated tooltip text from \"_Click to show Entire status._\" to \"_Click to open Session Bridge view._\"\n\n2. **`src/extension.ts`**:\n   - Added new command `FOCUS_VIEW` (line 20) with ID `\"session.bridge.entire.focusView\"`\n   - Added corresponding command title in `COMMAND_TITLES` (line 40)\n   - Changed status bar item creation to use `COMMAND_ID.FOCUS_VIEW` instead of `COMMAND_ID.SHOW_STATUS` (line 96)\n   - Updated `refreshWorkspaceProbe` to use `COMMAND_ID.FOCUS_VIEW` (line 293)\n   - Added command handler for `FOCUS_VIEW` that executes `workbench.view.extension.session-bridge` to open the view container (lines 473-477)\n\n### Behavior:\n\n- **Before**: Clicking the status bar item would show a message with the Entire CLI version and status\n- **After**: Clicking the status bar item now opens/focuses the Session Bridge view container in the activity bar, showing the Checkpoints and Checkpoint Sessions views\n\nThe `SHOW_STATUS` command is still available and can be accessed through the command palette if users want to check the CLI status. The compilation completed successfully with no errors or warnings.",
+          "time": {
+            "start": 1776104558090,
+            "end": 1776104565967
+          },
+          "id": "prt_d8814ce0a001mN4gso9L7bAYpv",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814c762001bFro0wlEXS5eaO"
+        },
+        {
+          "reason": "stop",
+          "snapshot": "bff6fcd240fe26a5c2a03af106780d9c4b4d22fe",
+          "type": "step-finish",
+          "tokens": {
+            "total": 33615,
+            "input": 245,
+            "output": 385,
+            "reasoning": 0,
+            "cache": {
+              "write": 0,
+              "read": 32985
+            }
+          },
+          "cost": 0,
+          "id": "prt_d8814ecd0002KYXVANmlCFQzOI",
+          "sessionID": "ses_277ed760bffeXZM4Joly2lQJzU",
+          "messageID": "msg_d8814c762001bFro0wlEXS5eaO"
+        }
+      ]
+    }
+  ]
+}

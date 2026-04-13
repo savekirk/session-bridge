@@ -17,6 +17,7 @@ const SESSIONS_VIEW_ID = 'session.bridge.entire.sessions';
 const CHECKPOINTS_VIEW_ID = 'session.bridge.entire.checkpoints';
 const enum COMMAND_ID {
 	SHOW_STATUS = "session.bridge.entire.showStatus",
+	FOCUS_VIEW = "session.bridge.entire.focusView",
 	ENABLE = "session.bridge.entire.enable",
 	DISABLE = "session.bridge.entire.disable",
 	REFRESH = "session.bridge.entire.refresh",
@@ -36,6 +37,7 @@ const TREE_VIEW_IDS = [
 
 const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.SHOW_STATUS]: 'Show Status',
+	[COMMAND_ID.FOCUS_VIEW]: 'Focus View',
 	[COMMAND_ID.ENABLE]: 'Enable In Repository',
 	[COMMAND_ID.DISABLE]: 'Disable In Repository',
 	[COMMAND_ID.REFRESH]: 'Refresh',
@@ -91,7 +93,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const initialProbeTarget = await resolveProbeTargetPath();
 	let workspaceState = await probeEntireWorkspace(initialProbeTarget);
 	await setWorkspaceContext(workspaceState.state);
-	const statusBarItem = createStatusBarItem(COMMAND_ID.SHOW_STATUS, workspaceState);
+	const statusBarItem = createStatusBarItem(COMMAND_ID.FOCUS_VIEW, workspaceState);
 	if (vscode.workspace.workspaceFolders?.length) {
 		statusBarItem.show();
 		context.subscriptions.push(statusBarItem);
@@ -287,7 +289,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		workspaceState = await probeEntireWorkspace(cwd);
 		await setWorkspaceContext(workspaceState.state);
 		await updateProbeWatchers(cwd);
-		updateStatusBarItem(statusBarItem, COMMAND_ID.SHOW_STATUS, workspaceState);
+		updateStatusBarItem(statusBarItem, COMMAND_ID.FOCUS_VIEW, workspaceState);
 		checkpointSessionsProvider.setWorkspaceState(workspaceState, cwd);
 		checkpointSessionsProvider.refresh();
 		checkpointProvider.setWorkspaceState(workspaceState, cwd);
@@ -466,6 +468,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				}
 				case COMMAND_ID.SHOW_STATUS: {
 					await showStatus();
+					break;
+				}
+				case COMMAND_ID.FOCUS_VIEW: {
+					appendCommandRun(commandId);
+					await vscode.commands.executeCommand('workbench.view.extension.session-bridge');
 					break;
 				}
 				default:

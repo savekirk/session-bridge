@@ -1,0 +1,74 @@
+{
+  "cli_version": "0.5.4",
+  "checkpoint_id": "220ab22aaa68",
+  "session_id": "ses_280fa301bffe2Zdl8q96YxhFwJ",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-13T07:18:17.576406Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "src/checkpoints/index.ts",
+    "src/checkpoints/models.ts",
+    "src/checkpoints/orchestration.ts",
+    "src/components/sessionDetailsPanel.ts",
+    "src/components/sessionsTreeView.ts",
+    "src/extension.ts",
+    "src/test/checkpoints/module.test.ts",
+    "src/test/components/sessionDetailsPanel.test.ts",
+    "src/test/components/sessionsUi.test.ts"
+  ],
+  "agent": "OpenCode",
+  "model": "gpt-5.4",
+  "turn_id": "6068a1258116",
+  "token_usage": {
+    "input_tokens": 43209,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 426112,
+    "output_tokens": 7379,
+    "api_call_count": 14
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-13T07:17:56.147664Z",
+    "agent_lines": 0,
+    "agent_removed": 51,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 176,
+    "total_committed": 146,
+    "total_lines_changed": 227,
+    "agent_percentage": 22.46696035242291,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 400,
+      "user_lines_removed": 176,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "src/checkpoints/index.ts": 1,
+        "src/checkpoints/models.ts": 2,
+        "src/checkpoints/orchestration.ts": 107,
+        "src/components/sessionDetailsPanel.ts": 6,
+        "src/components/sessionsTreeView.ts": 44,
+        "src/extension.ts": 29,
+        "src/test/checkpoints/module.test.ts": 170,
+        "src/test/components/sessionDetailsPanel.test.ts": 19,
+        "src/test/components/sessionsUi.test.ts": 22
+      },
+      "user_removed_per_file": {
+        "src/checkpoints/index.ts": 1,
+        "src/checkpoints/models.ts": 2,
+        "src/checkpoints/orchestration.ts": 87,
+        "src/components/sessionsTreeView.ts": 21,
+        "src/extension.ts": 24,
+        "src/test/checkpoints/module.test.ts": 11,
+        "src/test/components/sessionsUi.test.ts": 30
+      }
+    }
+  ]
+}

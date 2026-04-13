@@ -1,0 +1,1 @@
+On a small screen, the header for session details in [sessionDetailsPanel.ts](src/components/sessionDetailsPanel.ts) takes majority of of the space and not enough room for the conversation to be visible. Improve the design so user can see more conversation when scrolling

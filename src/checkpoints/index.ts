@@ -60,7 +60,7 @@ export {
 	listActiveSessions,
 	listCheckpointCards,
 	listCheckpointSummaries,
-	listSessions as listSessionsForCheckpointIds,
+	listSessions,
 	listSessionCards,
 	getSessionDetail,
 	getCheckpointDetail,

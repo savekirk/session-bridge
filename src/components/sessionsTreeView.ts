@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import {
-	listSessionsForCheckpointIds,
+	listSessions,
 	type EntireSessionCard,
 	type InitialAttribution,
 	type SessionCheckpointEntry,
@@ -32,6 +32,7 @@ type SessionTreeCard = {
 	sessionId: string;
 	status: SessionStatus;
 	promptPreview: string;
+	checkpoint: SessionCheckpointEntry;
 	agent?: string;
 	model?: string;
 	author?: string;
@@ -43,10 +44,6 @@ type SessionTreeCard = {
 	stepCount?: number;
 	toolCount?: number;
 	tokenCount?: number;
-	checkpointIds: string[];
-	checkpointEntries?: SessionCheckpointEntry[];
-	lastCheckpointId?: string;
-	canOpenLastCheckpoint: boolean;
 	canOpenTranscript: boolean;
 	searchText: string;
 };
@@ -112,8 +109,7 @@ export function getSessionDetailTarget(element: vscode.TreeItem | undefined): Se
 		sessionId: element.card.sessionId,
 		promptPreview: element.card.promptPreview,
 		source: "checkpoint",
-		checkpointIds: element.card.checkpointIds,
-		checkpointEntries: element.card.checkpointEntries,
+		checkpoint: element.card.checkpoint,
 	};
 }
 
@@ -136,7 +132,7 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 			repoPath: string,
 			checkpointId: string,
 			sessionPaths: SessionFilePaths[],
-		) => Promise<EntireSessionCard[]> = listSessionsForCheckpointIds,
+		) => Promise<EntireSessionCard[]> = listSessions,
 	) {
 		this.workspaceState = workspaceState;
 		this.repoPath = repoPath;
@@ -292,7 +288,9 @@ export class SessionsTreeViewProvider implements vscode.TreeDataProvider<vscode.
 			repoPath,
 			selection?.checkpointId ?? "",
 			selection?.sessionPaths ?? [],
-		).then((cards) => cards.map(adaptCheckpointSessionCard));
+		).then((cards) => cards
+			.map(adaptCheckpointSessionCard)
+			.filter((card): card is SessionTreeCard => card !== undefined));
 		const timeout = new Promise<never>((_resolve, reject) => {
 			setTimeout(() => reject(new Error("Session load timed out")), LOAD_TIMEOUT_MS);
 		});
@@ -403,9 +401,7 @@ function buildSessionTranscriptTarget(card: SessionTreeCard): SessionTranscriptT
 		sessionId: card.sessionId,
 		promptPreview: card.promptPreview,
 		source: "checkpoint",
-		checkpointIds: card.checkpointIds,
-		checkpointEntries: card.checkpointEntries,
-		lastCheckpointId: card.lastCheckpointId,
+		checkpoint: card.checkpoint,
 	};
 }
 
@@ -450,9 +446,7 @@ function buildSessionTooltip(card: SessionTreeCard): vscode.MarkdownString {
 		tooltip.appendMarkdown(`**Last Active:** ${escapeMarkdown(card.lastActivityAt)}\n\n`);
 	}
 
-	if (card.lastCheckpointId) {
-		tooltip.appendMarkdown(`**Latest Checkpoint:** ${escapeMarkdown(card.lastCheckpointId)}\n\n`);
-	}
+	tooltip.appendMarkdown(`**Checkpoint:** ${escapeMarkdown(card.checkpoint.checkpointId)}\n\n`);
 
 	const duration = buildDurationDetail(card);
 	if (duration) {
@@ -726,11 +720,17 @@ function sameSessionPaths(left: SessionFilePaths[], right: SessionFilePaths[]): 
 	});
 }
 
-function adaptCheckpointSessionCard(card: EntireSessionCard): SessionTreeCard {
+function adaptCheckpointSessionCard(card: EntireSessionCard): SessionTreeCard | undefined {
+	const checkpoint = selectSessionCheckpointEntry(card);
+	if (!checkpoint) {
+		return undefined;
+	}
+
 	return {
 		sessionId: card.sessionId,
 		status: card.status,
 		promptPreview: card.promptPreview,
+		checkpoint,
 		agent: card.agent,
 		model: card.model,
 		author: card.author,
@@ -742,11 +742,34 @@ function adaptCheckpointSessionCard(card: EntireSessionCard): SessionTreeCard {
 		stepCount: card.stepCount,
 		toolCount: card.toolCount,
 		tokenCount: card.tokenCount,
-		checkpointIds: [...card.checkpointIds],
-		checkpointEntries: card.checkpointEntries,
-		lastCheckpointId: card.latestCheckpointId,
-		canOpenLastCheckpoint: typeof card.latestCheckpointId === "string" && card.latestCheckpointId.length > 0,
-		canOpenTranscript: card.checkpointEntries?.some((entry) => typeof entry.session.transcript === "string" && entry.session.transcript.length > 0) ?? false,
+		canOpenTranscript: checkpoint.session.metadata.sessionId === card.sessionId
+			&& typeof checkpoint.session.transcript === "string"
+			&& checkpoint.session.transcript.length > 0,
 		searchText: card.searchText,
 	};
+}
+
+function selectSessionCheckpointEntry(card: EntireSessionCard): SessionCheckpointEntry | undefined {
+	const entries = card.checkpointEntries ?? [];
+	if (entries.length === 0) {
+		return undefined;
+	}
+
+	return [...entries].sort((left, right) => {
+		if (card.latestCheckpointId) {
+			const leftMatchesLatest = left.checkpointId === card.latestCheckpointId ? 1 : 0;
+			const rightMatchesLatest = right.checkpointId === card.latestCheckpointId ? 1 : 0;
+			if (leftMatchesLatest !== rightMatchesLatest) {
+				return rightMatchesLatest - leftMatchesLatest;
+			}
+		}
+
+		const leftTimestamp = Date.parse(left.session.metadata.createdAt ?? "");
+		const rightTimestamp = Date.parse(right.session.metadata.createdAt ?? "");
+		if (leftTimestamp !== rightTimestamp) {
+			return (Number.isNaN(rightTimestamp) ? 0 : rightTimestamp) - (Number.isNaN(leftTimestamp) ? 0 : leftTimestamp);
+		}
+
+		return right.sessionIndex - left.sessionIndex;
+	})[0];
 }

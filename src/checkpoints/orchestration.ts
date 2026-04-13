@@ -278,9 +278,15 @@ export async function listSessionCards(repoPath: string): Promise<EntireSessionC
  * @param repoPath Repository root used to load checkpoint metadata and live status overlays.
  * @param checkpointId Checkpoint ID currently selected in the checkpoint tree.
  * @param sessionPaths Session file paths already resolved for the selected checkpoint.
+ * @param sessionId Optional session ID to constrain committed session loading.
  * @returns Session cards that belong to the selected checkpoint.
  */
-export async function listSessions(repoPath: string, checkpointId: string, sessionPaths: SessionFilePaths[]): Promise<EntireSessionCard[]> {
+export async function listSessions(
+	repoPath: string,
+	checkpointId: string,
+	sessionPaths: SessionFilePaths[],
+	sessionId?: string,
+): Promise<EntireSessionCard[]> {
 	const normalizedSessionPaths = sessionPaths.filter((entry) => typeof entry.metadata === "string" && entry.metadata.length > 0);
 	const [stateIndex, gitEnrichment, store] = await Promise.all([
 		loadSessionStateIndex(repoPath),
@@ -310,11 +316,16 @@ export async function listSessions(repoPath: string, checkpointId: string, sessi
 	const summary = normalizedSessionPaths.length === 0
 		? await store.getCheckpointSummary(checkpointId)
 		: null;
-	const sessions = normalizedSessionPaths.length > 0
-		? await loadSessionsAtPathsWithRecovery(store, checkpointId, normalizedSessionPaths)
-		: summary
-			? await loadSessionsWithRecovery(store, checkpointId, summary)
-			: [];
+	const normalizedSessionId = collapseWhitespace(sessionId ?? "");
+	const sessions = normalizedSessionId.length > 0
+		? normalizedSessionPaths.length > 0
+			? await loadSessionsAtPathsWithRecovery(store, checkpointId, normalizedSessionPaths, normalizedSessionId)
+			: await loadSessionByIdWithRecovery(store, checkpointId, normalizedSessionId)
+		: normalizedSessionPaths.length > 0
+			? await loadSessionsAtPathsWithRecovery(store, checkpointId, normalizedSessionPaths)
+			: summary
+				? await loadSessionsWithRecovery(store, checkpointId, summary)
+				: [];
 	const checkpoint: LoadedCheckpointRecord = {
 		checkpointId,
 		summary,
@@ -334,25 +345,33 @@ export async function listSessions(repoPath: string, checkpointId: string, sessi
  * @returns Structured session details, or `null` when the selection can no longer be resolved.
  */
 export async function getSessionDetail(repoPath: string, target: SessionDetailTarget): Promise<EntireSessionDetailModel | null> {
-	const userDisplayName = await resolveUserDisplayName(repoPath);
 	if (target.source === "checkpoint") {
-		if ((target.checkpointEntries?.length ?? 0) === 0) {
+		if (target.checkpoint.session.metadata.sessionId !== target.sessionId) {
 			return null;
 		}
 
-		const stateIndex = await loadSessionStateIndex(repoPath);
-		return buildCheckpointSessionDetailModelFromEntries(target, target.checkpointEntries ?? [], stateIndex, userDisplayName);
+		const detailContext = await loadDetailContext(repoPath, [target.checkpoint.checkpointId]);
+		const checkpoint = await loadCheckpointRecord(
+			repoPath,
+			target.checkpoint.checkpointId,
+			detailContext,
+			false,
+		);
+		return buildCheckpointSessionDetailModel(target, detailContext.stateIndex, checkpoint?.commits[0]?.authorName);
 	}
 
-	const checkpointIds = sortUnique(
-		(target.checkpointIds ?? []).filter((checkpointId): checkpointId is string => typeof checkpointId === "string" && checkpointId.length > 0),
-	);
+	const userDisplayName = await resolveUserDisplayName(repoPath);
+	const targetCheckpointId = target.checkpoint.session.metadata.sessionId === target.sessionId
+		? target.checkpoint.checkpointId
+		: undefined;
+	const checkpointIds = sortUnique([targetCheckpointId].filter((checkpointId): checkpointId is string => typeof checkpointId === "string" && checkpointId.length > 0));
 	const detailContext = await loadDetailContext(repoPath, checkpointIds);
 	const liveState = detailContext.stateIndex.bySessionId.get(target.sessionId);
 
-	const resolvedCheckpointIds = checkpointIds.length > 0
-		? checkpointIds
-		: (liveState?.lastCheckpointId ? [liveState.lastCheckpointId] : []);
+	const resolvedCheckpointIds = sortUnique([
+		...checkpointIds,
+		...(liveState?.lastCheckpointId ? [liveState.lastCheckpointId] : []),
+	]);
 	const checkpoints = (await Promise.all(resolvedCheckpointIds.map(async (checkpointId) => loadCheckpointRecord(
 		repoPath,
 		checkpointId,
@@ -1049,15 +1068,18 @@ async function buildLiveSessionDetailModel(
 	const checkpoint = checkpoints.find((entry) => entry.checkpointId === liveState.lastCheckpointId)
 		?? checkpoints[0];
 	const checkpointSession = selectSessionContentForLiveSession(liveState, checkpoint);
-	const liveTranscript = await readTextIfExists(liveState.transcriptPath);
-	const transcript = liveTranscript ?? checkpointSession?.transcript ?? null;
-	const parsedTranscript = transcript
-		? parseNativeSessionTranscript(transcript, {
+	const candidateTranscript = await readTextIfExists(liveState.transcriptPath) ?? checkpointSession?.transcript ?? null;
+	const candidateParsedTranscript = candidateTranscript
+		? parseNativeSessionTranscript(candidateTranscript, {
 			agentHint: liveState.agentType ?? checkpointSession?.metadata.agent,
 			sessionIdHint: liveState.sessionId,
 			userHint: userDisplayName,
 		})
 		: null;
+	const transcript = transcriptMatchesSession(candidateParsedTranscript, liveState.sessionId)
+		? candidateTranscript
+		: null;
+	const parsedTranscript = transcript ? candidateParsedTranscript : null;
 	const turns = parsedTranscript?.turns ?? [];
 	const promptPreview = collapseWhitespace(liveState.lastPrompt ?? "").length > 0
 		? collapseWhitespace(liveState.lastPrompt ?? "")
@@ -1073,6 +1095,7 @@ async function buildLiveSessionDetailModel(
 		sessionId: liveState.sessionId,
 		source: "live",
 		promptPreview,
+		user: userDisplayName ?? selectTurnActorName(turns, "user"),
 		status: normalizeSessionStatus(liveState.phase, liveState.endedAt),
 		startedAt: liveState.startedAt ?? parsedTranscript?.startedAt ?? checkpointSession?.metadata.createdAt,
 		lastActivityAt: liveState.lastInteractionAt ?? parsedTranscript?.endedAt ?? checkpointSession?.metadata.createdAt,
@@ -1091,34 +1114,30 @@ async function buildLiveSessionDetailModel(
 	};
 }
 
-function buildCheckpointSessionDetailModelFromEntries(
+function buildCheckpointSessionDetailModel(
 	target: SessionDetailTarget,
-	sessionEntries: ReadonlyArray<Pick<SessionCheckpointEntry, "checkpointId" | "session" | "checkpointTokenUsage">>,
 	stateIndex: SessionStateIndex,
 	userDisplayName: string | undefined,
 ): EntireSessionDetailModel | null {
-	if (sessionEntries.length === 0) {
+	if (target.checkpoint.session.metadata.sessionId !== target.sessionId) {
 		return null;
 	}
 
-	const sortedEntries = [...sessionEntries].sort((left, right) => (
-		(parseTimestamp(extractTranscriptLatestTimestamp(right.session.transcript) ?? right.session.metadata.createdAt) ?? 0)
-		- (parseTimestamp(extractTranscriptLatestTimestamp(left.session.transcript) ?? left.session.metadata.createdAt) ?? 0)
-	));
-	const [latestEntry] = sortedEntries;
-	const transcriptEntry = sortedEntries.find((entry) => typeof entry.session.transcript === "string" && entry.session.transcript.length > 0)
-		?? latestEntry;
-	const transcript = transcriptEntry.session.transcript;
-	const parsedTranscript = transcript
-		? parseNativeSessionTranscript(transcript, {
-			agentHint: latestEntry.session.metadata.agent,
+	const entry = target.checkpoint;
+	const session = entry.session;
+	const candidateTranscript = session.transcript;
+	const candidateParsedTranscript = candidateTranscript
+		? parseNativeSessionTranscript(candidateTranscript, {
+			agentHint: session.metadata.agent,
 			sessionIdHint: target.sessionId,
 			userHint: userDisplayName,
 		})
 		: null;
+	const transcript = transcriptMatchesSession(candidateParsedTranscript, target.sessionId)
+		? candidateTranscript
+		: null;
+	const parsedTranscript = transcript ? candidateParsedTranscript : null;
 	const turns = parsedTranscript?.turns ?? [];
-	const checkpointCount = new Set(sessionEntries.map((entry) => entry.checkpointId)).size;
-	const sessions = sessionEntries.map((entry) => entry.session);
 
 	return {
 		sessionId: target.sessionId,
@@ -1126,24 +1145,45 @@ function buildCheckpointSessionDetailModelFromEntries(
 		promptPreview: collapseWhitespace(parsedTranscript?.promptPreview ?? "").length > 0
 			? collapseWhitespace(parsedTranscript?.promptPreview ?? "")
 			: selectPromptPreview(
-				latestEntry.session.prompts,
+				session.prompts,
 				transcript,
 				target.promptPreview,
 			),
+		user: userDisplayName ?? selectTurnActorName(turns, "user"),
 		status: getSessionStatus(target.sessionId, stateIndex),
-		startedAt: parsedTranscript?.startedAt ?? pickEarliestSessionTimestamp(sessionEntries),
-		lastActivityAt: parsedTranscript?.endedAt ?? pickLatestSessionTimestamp(sessionEntries),
-		durationMs: latestEntry.session.metadata.sessionMetrics?.durationMs,
-		checkpointCount,
-		turnCount: latestEntry.session.metadata.sessionMetrics?.turnCount ?? turns.length,
+		startedAt: parsedTranscript?.startedAt ?? extractTranscriptFirstTimestamp(transcript) ?? session.metadata.createdAt,
+		lastActivityAt: parsedTranscript?.endedAt ?? extractTranscriptLatestTimestamp(transcript) ?? session.metadata.createdAt,
+		durationMs: session.metadata.sessionMetrics?.durationMs,
+		checkpointCount: Math.max(session.metadata.checkpointsCount, 1),
+		turnCount: session.metadata.sessionMetrics?.turnCount ?? turns.length,
 		toolCount: parsedTranscript?.toolCount ?? countTranscriptToolUses(transcript),
-		tokenCount: totalTokenUsage(latestEntry.session.metadata.tokenUsage)
-			?? totalTokenUsage(latestEntry.checkpointTokenUsage),
-		model: parsedTranscript?.model ?? latestEntry.session.metadata.model,
-		attribution: selectLatestMetadataWithValue(sessions, (session) => session.metadata.initialAttribution),
+		tokenCount: totalTokenUsage(session.metadata.tokenUsage)
+			?? totalTokenUsage(entry.checkpointTokenUsage),
+		model: parsedTranscript?.model ?? session.metadata.model,
+		agent: session.metadata.agent,
+		attribution: session.metadata.initialAttribution,
 		transcriptAvailable: typeof transcript === "string" && transcript.length > 0,
 		turns,
 	};
+}
+
+function transcriptMatchesSession(
+	parsedTranscript: ReturnType<typeof parseNativeSessionTranscript>,
+	expectedSessionId: string,
+): boolean {
+	if (!parsedTranscript) {
+		return true;
+	}
+
+	const transcriptSessionId = collapseWhitespace(parsedTranscript.sessionId ?? "");
+	return transcriptSessionId.length === 0 || transcriptSessionId === expectedSessionId;
+}
+
+function selectTurnActorName(
+	turns: SessionDetailTurn[],
+	kind: SessionDetailTurn["actor"]["kind"],
+): string | undefined {
+	return turns.find((turn) => turn.actor.kind === kind)?.actor.name;
 }
 
 function selectSessionIds(checkpoint: LoadedCheckpointRecord | undefined): string[] {
@@ -1164,8 +1204,7 @@ function selectSessionContentForLiveSession(
 		return undefined;
 	}
 
-	return checkpoint.sessions.find((session) => session.metadata.sessionId === liveState.sessionId)
-		?? selectLatestSession(checkpoint.sessions);
+	return checkpoint.sessions.find((session) => session.metadata.sessionId === liveState.sessionId);
 }
 
 async function readTextIfExists(filePath: string | undefined): Promise<string | null> {
@@ -1370,44 +1409,6 @@ function selectRepresentativeCheckpointDetail(
 	return [...checkpoints].sort((left, right) => (parseTimestamp(right.time) ?? 0) - (parseTimestamp(left.time) ?? 0))[0];
 }
 
-function pickEarliestSessionTimestamp(
-	sessionEntries: ReadonlyArray<{ session: SessionContentRecord }>,
-): string | undefined {
-	let earliest: string | undefined;
-
-	for (const entry of sessionEntries) {
-		const candidate = extractTranscriptFirstTimestamp(entry.session.transcript) ?? entry.session.metadata.createdAt;
-		if (!candidate) {
-			continue;
-		}
-
-		if (!earliest || (parseTimestamp(candidate) ?? 0) < (parseTimestamp(earliest) ?? 0)) {
-			earliest = candidate;
-		}
-	}
-
-	return earliest;
-}
-
-function pickLatestSessionTimestamp(
-	sessionEntries: ReadonlyArray<{ session: SessionContentRecord }>,
-): string | undefined {
-	let latest: string | undefined;
-
-	for (const entry of sessionEntries) {
-		const candidate = extractTranscriptLatestTimestamp(entry.session.transcript) ?? entry.session.metadata.createdAt;
-		if (!candidate) {
-			continue;
-		}
-
-		if (!latest || (parseTimestamp(candidate) ?? 0) > (parseTimestamp(latest) ?? 0)) {
-			latest = candidate;
-		}
-	}
-
-	return latest;
-}
-
 function countToolsFromTurns(turns: SessionDetailTurn[]): number | undefined {
 	const total = turns.reduce((sum, turn) => sum + turn.toolActivities.length, 0);
 	return total > 0 ? total : undefined;
@@ -1430,15 +1431,34 @@ async function loadSessionsWithRecovery(
 	return results.filter((session): session is SessionContentRecord => session !== null);
 }
 
+async function loadSessionByIdWithRecovery(
+	store: BaseCheckpointStore,
+	checkpointId: string,
+	sessionId: string,
+): Promise<SessionContentRecord[]> {
+	try {
+		const session = await store.getSessionContentById(checkpointId, sessionId);
+		return session.metadata.sessionId === sessionId ? [session] : [];
+	} catch {
+		return [];
+	}
+}
+
 async function loadSessionsAtPathsWithRecovery(
 	store: BaseCheckpointStore,
 	checkpointId: string,
 	sessionPaths: SessionFilePaths[],
+	expectedSessionId?: string,
 ): Promise<SessionContentRecord[]> {
 	const results = await Promise.all(
 		sessionPaths.map(async (paths, index) => {
 			try {
-				return await store.getSessionContent(checkpointId, index, paths);
+				const session = await store.getSessionContent(checkpointId, index, paths);
+				if (expectedSessionId && session.metadata.sessionId !== expectedSessionId) {
+					return null;
+				}
+
+				return session;
 			} catch {
 				return null;
 			}

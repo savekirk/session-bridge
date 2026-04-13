@@ -118,8 +118,7 @@ export interface SessionDetailTarget {
 	sessionId: string;
 	promptPreview: string;
 	source: "live" | "checkpoint";
-	checkpointIds?: string[];
-	checkpointEntries?: SessionCheckpointEntry[];
+	checkpoint: SessionCheckpointEntry;
 }
 
 export interface SessionTranscriptTarget extends SessionDetailTarget {
@@ -161,6 +160,7 @@ export interface EntireSessionDetailModel {
 	sessionId: string;
 	source: "live" | "checkpoint";
 	promptPreview: string;
+	user?: string;
 	status: SessionStatus;
 	startedAt?: string;
 	lastActivityAt?: string;

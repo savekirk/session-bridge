@@ -91,6 +91,25 @@ suite("Session Details Panel", () => {
 		assert.strictEqual(html.match(/2026/g)?.length, 2);
 	});
 
+	test("detail renderer includes the selected session user in the header", () => {
+		const html = renderSessionDetailsHtml({
+			kind: "detail",
+			detail: {
+				sessionId: "session-user-summary",
+				source: "checkpoint",
+				promptPreview: "Historical session",
+				user: "Test User",
+				status: "ENDED",
+				checkpointCount: 1,
+				transcriptAvailable: true,
+				turns: [],
+			},
+		}, { cspSource: "vscode-webview:" });
+
+		assert.ok(html.includes(">User<"));
+		assert.ok(html.includes("Test User"));
+	});
+
 	test("detail renderer derives the header agent label from transcript turns when detail agent is missing", () => {
 		const html = renderSessionDetailsHtml({
 			kind: "detail",
@@ -136,8 +155,8 @@ suite("Session Details Panel", () => {
 		assert.strictEqual(html.includes("undefined"), false);
 	});
 
-	test("detail renderer lets the header title expand beside the status badge", () => {
-		const html = renderSessionDetailsHtml({
+		test("detail renderer lets the header title expand beside the status badge", () => {
+			const html = renderSessionDetailsHtml({
 			kind: "detail",
 			detail: {
 				sessionId: "session-wide-header",
@@ -153,11 +172,14 @@ suite("Session Details Panel", () => {
 			},
 		}, { cspSource: "vscode-webview:" });
 
-		assert.ok(html.includes('class="summary__headline"'));
-		assert.ok(html.includes("margin-left: auto;"));
-		assert.ok(html.includes("overflow-wrap: anywhere;"));
-		assert.strictEqual(html.includes("max-width: 12ch;"), false);
-	});
+			assert.ok(html.includes('class="summary__headline"'));
+			assert.ok(html.includes("margin-left: auto;"));
+			assert.ok(html.includes("overflow-wrap: anywhere;"));
+			assert.strictEqual(html.includes("max-width: 12ch;"), false);
+			assert.strictEqual(html.match(/class="summary"/g)?.length, 1);
+			assert.ok(html.includes("overflow-x: auto;"));
+			assert.ok(html.includes("scroll-snap-type: x proximity;"));
+		});
 
 	test("detail renderer hides agent identity chrome for tool-only turns", () => {
 		const html = renderSessionDetailsHtml({
@@ -261,8 +283,8 @@ suite("Session Details Panel", () => {
 		assert.ok(html.includes("View rendered at 15:10:42."));
 	});
 
-	test("detail renderer uses day and time for multi-day sessions without full date", () => {
-		const html = renderSessionDetailsHtml({
+		test("detail renderer uses day and time for multi-day sessions without full date", () => {
+			const html = renderSessionDetailsHtml({
 			kind: "detail",
 			detail: {
 				sessionId: "session-456",
@@ -288,7 +310,23 @@ suite("Session Details Panel", () => {
 			},
 		}, { cspSource: "vscode-webview:" });
 
-		assert.ok(html.includes("Apr"));
-		assert.strictEqual(html.includes("2026"), false);
-	});
+			assert.ok(html.includes("Apr"));
+			assert.strictEqual(html.includes("2026"), false);
+		});
+
+		test("status renderer places summary inside the scrollable conversation area", () => {
+			const html = renderSessionDetailsHtml({
+				kind: "loading",
+				promptPreview: "Loading transcript",
+				sessionId: "session-loading",
+			}, { cspSource: "vscode-webview:" });
+
+			const conversationScrollIndex = html.indexOf('class="conversation__scroll"');
+			const summaryIndex = html.indexOf('class="summary"');
+			const emptyStateIndex = html.indexOf('class="empty"');
+
+			assert.ok(conversationScrollIndex >= 0);
+			assert.ok(summaryIndex > conversationScrollIndex);
+			assert.ok(emptyStateIndex > summaryIndex);
+		});
 });

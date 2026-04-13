@@ -136,21 +136,12 @@ suite("Sessions UI", () => {
 			sessionId: "checkpoint-session-with-transcript",
 			promptPreview: "Checkpoint session prompt",
 			source: "checkpoint",
-			checkpointIds: ["a3b2c4d5e6f7", "b4c5d6e7f8a9"],
-			checkpointEntries: [
-				createCheckpointEntry({
-					checkpointId: "a3b2c4d5e6f7",
-					sessionId: "checkpoint-session-with-transcript",
-					createdAt: "2026-04-04T10:00:00Z",
-				}),
-				createCheckpointEntry({
-					checkpointId: "b4c5d6e7f8a9",
-					sessionId: "checkpoint-session-with-transcript",
-					sessionIndex: 1,
-					createdAt: "2026-04-04T11:00:00Z",
-				}),
-			],
-			lastCheckpointId: "b4c5d6e7f8a9",
+			checkpoint: createCheckpointEntry({
+				checkpointId: "b4c5d6e7f8a9",
+				sessionId: "checkpoint-session-with-transcript",
+				sessionIndex: 1,
+				createdAt: "2026-04-04T11:00:00Z",
+			}),
 		});
 	});
 
@@ -233,6 +224,7 @@ suite("Sessions UI", () => {
 				createCheckpointSessionCard({
 					sessionId: "checkpoint-session",
 					checkpointIds: ["a3b2c4d5e6f7", "b4c5d6e7f8a9"],
+					latestCheckpointId: "b4c5d6e7f8a9",
 					promptPreview: "Checkpoint prompt",
 					checkpointEntries: [
 						createCheckpointEntry({
@@ -261,20 +253,12 @@ suite("Sessions UI", () => {
 			sessionId: "checkpoint-session",
 			promptPreview: "Checkpoint prompt",
 			source: "checkpoint",
-			checkpointIds: ["a3b2c4d5e6f7", "b4c5d6e7f8a9"],
-			checkpointEntries: [
-				createCheckpointEntry({
-					checkpointId: "a3b2c4d5e6f7",
-					sessionId: "checkpoint-session",
-					createdAt: "2026-04-04T10:00:00Z",
-				}),
-				createCheckpointEntry({
-					checkpointId: "b4c5d6e7f8a9",
-					sessionId: "checkpoint-session",
-					sessionIndex: 1,
-					createdAt: "2026-04-04T11:00:00Z",
-				}),
-			],
+			checkpoint: createCheckpointEntry({
+				checkpointId: "b4c5d6e7f8a9",
+				sessionId: "checkpoint-session",
+				sessionIndex: 1,
+				createdAt: "2026-04-04T11:00:00Z",
+			}),
 		});
 	});
 });
@@ -314,13 +298,21 @@ function createSessionPaths(checkpointId = "a3b2c4d5e6f7"): SessionFilePaths[] {
 }
 
 function createCheckpointSessionCard(overrides: Partial<EntireSessionCard> = {}): EntireSessionCard {
+	const checkpointEntries = overrides.checkpointEntries ?? [
+		createCheckpointEntry({
+			checkpointId: overrides.latestCheckpointId ?? overrides.checkpointIds?.[0] ?? "a3b2c4d5e6f7",
+			sessionId: overrides.sessionId ?? "checkpoint-session",
+			createdAt: overrides.createdAt ?? "2026-04-04T09:00:00Z",
+		}),
+	];
+
 	return {
 		id: overrides.sessionId ?? "checkpoint-session",
 		sessionId: overrides.sessionId ?? "checkpoint-session",
 		promptPreview: overrides.promptPreview ?? "Checkpoint session prompt",
 		displayHash: overrides.displayHash ?? "a3b2c4d5e6f7",
 		checkpointIds: overrides.checkpointIds ?? ["a3b2c4d5e6f7"],
-		checkpointEntries: overrides.checkpointEntries,
+		checkpointEntries,
 		agent: overrides.agent ?? "Cursor",
 		model: overrides.model ?? "model-x",
 		status: overrides.status ?? "ENDED",

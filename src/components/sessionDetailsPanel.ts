@@ -139,13 +139,18 @@ export function renderSessionDetailsHtml(
 
 		.layout {
 			display: grid;
-			grid-template-rows: auto minmax(0, 1fr);
+			grid-template-rows: minmax(0, 1fr);
 			height: 100vh;
 		}
 
 		.summary {
+			margin-bottom: 20px;
 			padding: 28px 24px 18px;
-			border-bottom: 1px solid var(--session-detail-border);
+			border: 1px solid var(--session-detail-border);
+			border-radius: 22px;
+			box-shadow:
+				inset 0 1px 0 color-mix(in srgb, white 4%, transparent),
+				0 10px 24px color-mix(in srgb, black 16%, transparent);
 			background:
 				linear-gradient(180deg, color-mix(in srgb, var(--vscode-editor-background) 90%, black 10%), color-mix(in srgb, var(--vscode-editor-background) 96%, black 4%));
 		}
@@ -161,6 +166,10 @@ export function renderSessionDetailsHtml(
 			align-items: flex-start;
 			gap: 16px;
 			margin-bottom: 18px;
+		}
+
+		.summary__top:last-child {
+			margin-bottom: 0;
 		}
 
 		.summary__headline {
@@ -547,13 +556,66 @@ export function renderSessionDetailsHtml(
 			background: color-mix(in srgb, var(--vscode-editorWidget-background) 82%, black 18%);
 		}
 
-		@media (max-width: 680px) {
+		@media (max-width: 760px), (max-height: 720px) {
+			.summary {
+				margin-bottom: 18px;
+				padding: 16px 16px 14px;
+				border-radius: 18px;
+			}
+
+			.conversation__heading {
+				padding: 12px 16px 8px;
+			}
+
+			.conversation__scroll {
+				padding: 14px 16px 32px;
+			}
+
 			.summary__top {
 				flex-direction: column;
+				align-items: stretch;
+				gap: 10px;
+			}
+
+			.summary__eyebrow {
+				display: none;
+			}
+
+			.summary__title {
+				font-size: 18px;
+				line-height: 1.3;
 			}
 
 			.status {
 				margin-left: 0;
+				align-self: flex-start;
+				padding: 6px 10px;
+			}
+
+			.summary__meta {
+				display: flex;
+				gap: 8px;
+				overflow-x: auto;
+				overscroll-behavior-x: contain;
+				padding: 2px 2px 4px;
+				margin: 12px -2px -4px;
+				scroll-snap-type: x proximity;
+			}
+
+			.meta-card {
+				flex: 0 0 min(76vw, 240px);
+				padding: 10px 12px;
+				border-radius: 14px;
+				scroll-snap-align: start;
+			}
+
+			.meta-card__label {
+				margin-bottom: 4px;
+			}
+
+			.meta-card__value {
+				font-size: 12px;
+				line-height: 1.4;
 			}
 		}
 	</style>
@@ -576,6 +638,7 @@ function renderDetailState(detail: EntireSessionDetailModel): string {
 	const metaCards = [
 		renderMetaCard("Session ID", detail.sessionId),
 		renderMetaCard("Source", detail.source === "live" ? "Live session" : "Checkpoint snapshot"),
+		renderMetaCard("User", formatUserSummary(detail)),
 		renderMetaCard("Started", formatSummaryTimestamp(detail.startedAt)),
 		renderMetaCard("Last Active", formatSummaryTimestamp(detail.lastActivityAt)),
 		renderMetaCard("Duration", formatDuration(detail.durationMs)),
@@ -583,56 +646,70 @@ function renderDetailState(detail: EntireSessionDetailModel): string {
 		renderMetaCard("Stats", statsParts.join(" · ")),
 		renderMetaCard("Attribution", formatAttribution(detail)),
 	].filter((card): card is string => typeof card === "string");
+	const summary = renderSummary({
+		title: detail.promptPreview || detail.sessionId,
+		status: detail.status,
+		metaCards,
+	});
+	const content = detail.turns.length > 0
+		? renderConversation(detail, includeDayInTimestamp)
+		: `<div class="empty">${escapeHtml(detail.transcriptAvailable ? "No readable transcript turns were found." : "No transcript is available for this session.")}</div>`;
 
-	return `<div class="layout">
-	<header class="summary">
-		<div class="summary__inner">
-			<div class="summary__top">
-				<div class="summary__headline">
-					<p class="summary__eyebrow">Session Details</p>
-					<h1 class="summary__title">${escapeHtml(detail.promptPreview || detail.sessionId)}</h1>
-				</div>
-				<span class="status">${escapeHtml(detail.status)}</span>
-			</div>
-			<div class="summary__meta">
-				${metaCards.join("")}
-			</div>
-		</div>
-	</header>
-	<section class="conversation">
-		<div class="conversation__heading">Conversation</div>
-		<div class="conversation__scroll">
-			<div class="conversation__inner">
-				${detail.turns.length > 0
-					? renderConversation(detail, includeDayInTimestamp)
-					: `<div class="empty">${escapeHtml(detail.transcriptAvailable ? "No readable transcript turns were found." : "No transcript is available for this session.")}</div>`}
-			</div>
-		</div>
-	</section>
-</div>`;
+	return renderPanelLayout(summary, content);
 }
 
 function renderStatusState(title: string, message: string): string {
+	return renderPanelLayout(
+		renderSummary({
+			title,
+		}),
+		`<div class="empty">${escapeHtml(message)}</div>`,
+	);
+}
+
+function renderPanelLayout(
+	summary: string,
+	content: string,
+): string {
 	return `<div class="layout">
-	<header class="summary">
-		<div class="summary__inner">
-			<div class="summary__top">
-				<div class="summary__headline">
-					<p class="summary__eyebrow">Session Details</p>
-					<h1 class="summary__title">${escapeHtml(title)}</h1>
-				</div>
-			</div>
-		</div>
-	</header>
 	<section class="conversation">
 		<div class="conversation__heading">Conversation</div>
 		<div class="conversation__scroll">
 			<div class="conversation__inner">
-				<div class="empty">${escapeHtml(message)}</div>
+				${summary}
+				${content}
 			</div>
 		</div>
 	</section>
-</div>`;
+	</div>`;
+}
+
+function renderSummary(options: {
+	title: string;
+	status?: string;
+	metaCards?: string[];
+}): string {
+	const header = renderSummaryHeader(options.title, options.status);
+	const meta = options.metaCards && options.metaCards.length > 0
+		? `<div class="summary__meta">${options.metaCards.join("")}</div>`
+		: "";
+
+	return `<header class="summary">
+		<div class="summary__inner">
+			${header}
+			${meta}
+		</div>
+	</header>`;
+}
+
+function renderSummaryHeader(title: string, status?: string): string {
+	return `<div class="summary__top">
+		<div class="summary__headline">
+			<p class="summary__eyebrow">Session Details</p>
+			<h1 class="summary__title">${escapeHtml(title)}</h1>
+		</div>
+		${status ? `<span class="status">${escapeHtml(status)}</span>` : ""}
+	</div>`;
 }
 
 function renderMetaCard(label: string, value: string | undefined): string | undefined {
@@ -820,6 +897,11 @@ function formatAgentSummary(detail: EntireSessionDetailModel): string | undefine
 	}
 
 	return `${normalizedAgentName} (${normalizedModel})`;
+}
+
+function formatUserSummary(detail: EntireSessionDetailModel): string | undefined {
+	return sanitizeDisplayLabel(detail.user)
+		?? sanitizeDisplayLabel(detail.turns.find((turn) => turn.actor.kind === "user")?.actor.name);
 }
 
 function formatDetailTimestamp(timestamp: string | undefined, includeDayInTimestamp: boolean): string | undefined {

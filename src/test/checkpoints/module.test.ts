@@ -17,7 +17,7 @@ import {
 	listActiveSessions,
 	listCheckpointCards,
 	listCheckpointSummaries,
-	listSessionsForCheckpointIds,
+	listSessions,
 	listSessionCards,
 	loadRewindIndex,
 	shadowBranchNameForCommit,
@@ -215,7 +215,7 @@ suite("Checkpoint Module", function () {
 				assert.strictEqual(alphaSession.status, "ACTIVE");
 				assert.strictEqual(alphaSession.checkpointCount, 2);
 
-				const selectedCheckpointSessions = await listSessionsForCheckpointIds(
+				const selectedCheckpointSessions = await listSessions(
 					repoDir,
 					"a3b2c4d5e6f7",
 					readCheckpointSessionPaths(fixtureRoot, "a3b2c4d5e6f7"),
@@ -227,6 +227,8 @@ suite("Checkpoint Module", function () {
 				const selectedAlphaSession = selectedCheckpointSessions.find((card) => card.sessionId === "2026-03-30-alpha");
 				assert.strictEqual(selectedAlphaSession?.lastActivityAt, "2026-03-30T10:01:00.000Z");
 				assert.strictEqual(selectedAlphaSession?.checkpointEntries?.length, 1);
+				const selectedAlphaCheckpoint = selectedAlphaSession?.checkpointEntries?.[0];
+				assert.ok(selectedAlphaCheckpoint);
 				const betaSession = selectedCheckpointSessions.find((card) => card.sessionId === "2026-03-30-beta");
 				assert.strictEqual(betaSession?.lastActivityAt, "2026-03-30T11:02:00.000Z");
 
@@ -258,8 +260,7 @@ suite("Checkpoint Module", function () {
 					sessionId: "2026-03-30-alpha",
 					promptPreview: "Build the parser",
 					source: "checkpoint",
-					checkpointIds: ["a3b2c4d5e6f7"],
-					checkpointEntries: selectedAlphaSession?.checkpointEntries,
+					checkpoint: selectedAlphaCheckpoint!,
 				});
 				assert.ok(checkpointSessionDetail);
 				assert.strictEqual(checkpointSessionDetail?.source, "checkpoint");
@@ -274,14 +275,23 @@ suite("Checkpoint Module", function () {
 					sessionId: "2026-03-30-alpha",
 					promptPreview: "Build the parser",
 					source: "checkpoint",
-					checkpointIds: ["a3b2c4d5e6f7"],
+					checkpoint: {
+						...selectedAlphaCheckpoint!,
+						session: {
+							...selectedAlphaCheckpoint!.session,
+							metadata: {
+								...selectedAlphaCheckpoint!.session.metadata,
+								sessionId: "different-session",
+							},
+						},
+					},
 				}), null);
 
 				const liveSessionDetail = await getSessionDetail(repoDir, {
 					sessionId: "2026-03-30-alpha",
 					promptPreview: "Build the parser",
 					source: "live",
-					checkpointIds: ["a3b2c4d5e6f7"],
+					checkpoint: selectedAlphaCheckpoint!,
 				});
 				assert.ok(liveSessionDetail);
 				assert.strictEqual(liveSessionDetail?.source, "live");
@@ -289,6 +299,27 @@ suite("Checkpoint Module", function () {
 				assert.strictEqual(liveSessionDetail?.transcriptAvailable, true);
 				assert.strictEqual(liveSessionDetail?.turns.length, 3);
 				assert.strictEqual(liveSessionDetail?.turns[0]?.actor.name, "Test User");
+
+				writeLiveSessionState(repoDir, {
+					session_id: "mismatched-live",
+					base_commit: setup.mainHead,
+					worktree_path: repoDir,
+					started_at: startedLiveOnly,
+					phase: "idle",
+					last_interaction_time: interactedLiveOnly,
+					last_checkpoint_id: "a3b2c4d5e6f7",
+					last_prompt: "Keep the live transcript scoped",
+				});
+				const mismatchedLiveDetail = await getSessionDetail(repoDir, {
+					sessionId: "mismatched-live",
+					promptPreview: "Keep the live transcript scoped",
+					source: "live",
+					checkpoint: selectedAlphaCheckpoint!,
+				});
+				assert.ok(mismatchedLiveDetail);
+				assert.strictEqual(mismatchedLiveDetail?.promptPreview, "Keep the live transcript scoped");
+				assert.strictEqual(mismatchedLiveDetail?.transcriptAvailable, false);
+				assert.strictEqual(mismatchedLiveDetail?.turns.length, 0);
 
 				const detail = await getCheckpointDetail(repoDir, "a3b2c4d5e6f7");
 				assert.ok(detail);
@@ -339,7 +370,7 @@ suite("Checkpoint Module", function () {
 			createRepoWithMetadata(repoDir, customFixtureRoot);
 
 			await withMockEntire(repoDir, "[]", async () => {
-				const selectedCheckpointSessions = await listSessionsForCheckpointIds(
+				const selectedCheckpointSessions = await listSessions(
 					repoDir,
 					"a3b2c4d5e6f7",
 					readCheckpointSessionPaths(customFixtureRoot, "a3b2c4d5e6f7"),
@@ -356,6 +387,89 @@ suite("Checkpoint Module", function () {
 		} finally {
 			fs.rmSync(repoDir, { recursive: true, force: true });
 			fs.rmSync(customFixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	test("checkpoint session detail uses the associated commit author instead of the current git user", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			createRepoWithMetadata(repoDir);
+			git(repoDir, ["config", "user.name", "Current Operator"]);
+
+			await withMockEntire(repoDir, "[]", async () => {
+				const selectedCheckpointSessions = await listSessions(
+					repoDir,
+					"a3b2c4d5e6f7",
+					readCheckpointSessionPaths(fixtureRoot, "a3b2c4d5e6f7"),
+				);
+				const selectedAlphaCheckpoint = selectedCheckpointSessions
+					.find((card) => card.sessionId === "2026-03-30-alpha")
+					?.checkpointEntries?.[0];
+				assert.ok(selectedAlphaCheckpoint);
+
+				const detail = await getSessionDetail(repoDir, {
+					sessionId: "2026-03-30-alpha",
+					promptPreview: "Build the parser",
+					source: "checkpoint",
+					checkpoint: selectedAlphaCheckpoint!,
+				});
+				assert.ok(detail);
+				assert.strictEqual(detail?.user, "Test User");
+				assert.strictEqual(detail?.turns[0]?.actor.name, "Test User");
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
+	test("checkpoint session detail rejects transcript content tagged for a different session id", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			createRepoWithMetadata(repoDir);
+
+			await withMockEntire(repoDir, "[]", async () => {
+				const selectedCheckpointSessions = await listSessions(
+					repoDir,
+					"a3b2c4d5e6f7",
+					readCheckpointSessionPaths(fixtureRoot, "a3b2c4d5e6f7"),
+				);
+				const selectedAlphaCheckpoint = selectedCheckpointSessions
+					.find((card) => card.sessionId === "2026-03-30-alpha")
+					?.checkpointEntries?.[0];
+				assert.ok(selectedAlphaCheckpoint);
+
+				const detail = await getSessionDetail(repoDir, {
+					sessionId: "2026-03-30-alpha",
+					promptPreview: "Build the parser",
+					source: "checkpoint",
+					checkpoint: {
+						...selectedAlphaCheckpoint!,
+						session: {
+							...selectedAlphaCheckpoint!.session,
+							transcript: JSON.stringify({
+								sessionId: "wrong-session",
+								projectHash: "abc123",
+								messages: [
+									{
+										id: "u1",
+										timestamp: "2026-03-18T21:05:13.497Z",
+										type: "user",
+										content: "This should not show up.",
+									},
+								],
+							}),
+						},
+					},
+				});
+				assert.ok(detail);
+				assert.strictEqual(detail?.promptPreview, "Build the parser");
+				assert.strictEqual(detail?.transcriptAvailable, false);
+				assert.strictEqual(detail?.turns.length, 0);
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
 		}
 	});
 
@@ -396,7 +510,7 @@ suite("Checkpoint Module", function () {
 		}
 	});
 
-	test("listSessionsForCheckpointIds falls back to the selected checkpoint id when session paths are unavailable", async () => {
+	test("listSessions falls back to the selected checkpoint id when session paths are unavailable", async () => {
 		const repoDir = createTempRepo();
 
 		try {
@@ -412,7 +526,7 @@ suite("Checkpoint Module", function () {
 
 			try {
 				await withMockEntire(repoDir, "[]", async () => {
-					const selectedCheckpointSessions = await listSessionsForCheckpointIds(repoDir, "a3b2c4d5e6f7", []);
+					const selectedCheckpointSessions = await listSessions(repoDir, "a3b2c4d5e6f7", []);
 					assert.strictEqual(selectedCheckpointSessions.length, 2);
 					assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "2026-03-30-alpha"), true);
 					assert.strictEqual(selectedCheckpointSessions.some((card) => card.sessionId === "2026-03-30-beta"), true);
@@ -425,7 +539,29 @@ suite("Checkpoint Module", function () {
 		}
 	});
 
-	test("listSessionsForCheckpointIds uses provided session paths without re-reading the selected checkpoint summary", async () => {
+	test("listSessions filters summary fallback loads to the requested session id", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			createRepoWithMetadata(repoDir);
+
+			await withMockEntire(repoDir, "[]", async () => {
+				const selectedCheckpointSessions = await listSessions(
+					repoDir,
+					"a3b2c4d5e6f7",
+					[],
+					"2026-03-30-alpha",
+				);
+				assert.strictEqual(selectedCheckpointSessions.length, 1);
+				assert.strictEqual(selectedCheckpointSessions[0]?.sessionId, "2026-03-30-alpha");
+				assert.strictEqual(selectedCheckpointSessions[0]?.checkpointEntries?.every((entry) => entry.session.metadata.sessionId === "2026-03-30-alpha"), true);
+			});
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
+	test("listSessions uses provided session paths without re-reading the selected checkpoint summary", async () => {
 		const repoDir = createTempRepo();
 
 		try {
@@ -442,7 +578,7 @@ suite("Checkpoint Module", function () {
 
 			try {
 				await withMockEntire(repoDir, "[]", async () => {
-					const selectedCheckpointSessions = await listSessionsForCheckpointIds(
+					const selectedCheckpointSessions = await listSessions(
 						repoDir,
 						"a3b2c4d5e6f7",
 						selectedSessionPaths,
@@ -454,6 +590,29 @@ suite("Checkpoint Module", function () {
 			} finally {
 				GitCheckpointStore.prototype.getCheckpointSummary = originalGetCheckpointSummary;
 			}
+		} finally {
+			fs.rmSync(repoDir, { recursive: true, force: true });
+		}
+	});
+
+	test("listSessions filters provided session paths to the requested session id", async () => {
+		const repoDir = createTempRepo();
+
+		try {
+			createRepoWithMetadata(repoDir);
+			const selectedSessionPaths = readCheckpointSessionPaths(fixtureRoot, "a3b2c4d5e6f7");
+
+			await withMockEntire(repoDir, "[]", async () => {
+				const selectedCheckpointSessions = await listSessions(
+					repoDir,
+					"a3b2c4d5e6f7",
+					selectedSessionPaths,
+					"2026-03-30-beta",
+				);
+				assert.strictEqual(selectedCheckpointSessions.length, 1);
+				assert.strictEqual(selectedCheckpointSessions[0]?.sessionId, "2026-03-30-beta");
+				assert.strictEqual(selectedCheckpointSessions[0]?.checkpointEntries?.every((entry) => entry.session.metadata.sessionId === "2026-03-30-beta"), true);
+			});
 		} finally {
 			fs.rmSync(repoDir, { recursive: true, force: true });
 		}

@@ -1,0 +1,14 @@
+Implement the commands https://docs.entire.io/cli/commands.md
+
+---
+
+Move them to commands typescript module and use them in @src/extension.ts
+
+---
+
+Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed.
+
+---
+
+- show status should run entire status
+- all commands should run directly in the terminal instead of running it through node and outputing the result

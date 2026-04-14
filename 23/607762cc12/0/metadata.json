@@ -1,0 +1,53 @@
+{
+  "cli_version": "0.5.5",
+  "checkpoint_id": "23607762cc12",
+  "session_id": "914f3c63-152a-4f25-9f4e-367c43140554",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-14T15:28:27.560345Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "README.md"
+  ],
+  "agent": "Gemini CLI",
+  "model": "gemini-3-flash-preview",
+  "turn_id": "7eaf564c1842",
+  "token_usage": {
+    "input_tokens": 62714,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 36652,
+    "output_tokens": 700,
+    "api_call_count": 3
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-14T15:28:27.557182Z",
+    "agent_lines": 15,
+    "agent_removed": 0,
+    "human_added": 0,
+    "human_modified": 0,
+    "human_removed": 5,
+    "total_committed": 15,
+    "total_lines_changed": 20,
+    "agent_percentage": 75,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 243,
+      "user_lines_removed": 5,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "README.md": 5,
+        "src/entireCommand.ts": 238
+      },
+      "user_removed_per_file": {
+        "README.md": 5
+      }
+    }
+  ]
+}

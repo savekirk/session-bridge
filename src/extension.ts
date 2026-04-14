@@ -45,6 +45,7 @@ const enum COMMAND_ID {
 	RESUME = "session.bridge.entire.resume",
 	REWIND = "session.bridge.entire.rewind",
 	EXPLAIN = "session.bridge.entire.explain",
+	REPORT_ISSUE = "session.bridge.entire.reportIssue",
 }
 
 const TREE_VIEW_IDS = [
@@ -70,6 +71,7 @@ const COMMAND_TITLES: Record<COMMAND_ID, string> = {
 	[COMMAND_ID.RESUME]: 'Resume Entire Session',
 	[COMMAND_ID.REWIND]: 'Rewind Entire Session',
 	[COMMAND_ID.EXPLAIN]: 'Explain Entire Session',
+	[COMMAND_ID.REPORT_ISSUE]: 'Report Issue',
 };
 
 
@@ -484,6 +486,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					break;
 				case COMMAND_ID.EXPLAIN:
 					await explainSession(commandContext);
+					break;
+				case COMMAND_ID.REPORT_ISSUE:
+					{
+						const extension = vscode.extensions.getExtension('kirk-agbenyegah.session-bridge');
+						const bugs = extension?.packageJSON?.bugs;
+						let url = typeof bugs === 'string' ? bugs : bugs?.url;
+						if (!url) {
+							const repository = extension?.packageJSON?.repository;
+							url = typeof repository === 'string' ? repository : repository?.url;
+							if (url) {
+								if (url.startsWith('git+')) {
+									url = url.slice(4);
+								}
+								if (url.endsWith('.git')) {
+									url = url.slice(0, -4);
+								}
+								url = url.endsWith('/') ? `${url}issues` : `${url}/issues`;
+							}
+						}
+
+						if (url) {
+							await vscode.env.openExternal(vscode.Uri.parse(url));
+						} else {
+							await vscode.window.showErrorMessage("Issue reporting URL not found in package.json");
+						}
+					}
 					break;
 				default:
 					await showPlaceholder(commandId);

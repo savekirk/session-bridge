@@ -5,6 +5,9 @@
   "version": "0.0.1",
   "publisher": "kirk-agbenyegah",
   "repository": "https://github.com/savekirk/session-bridge",
+  "bugs": {
+    "url": "https://github.com/savekirk/session-bridge/issues"
+  },
   "engines": {
     "vscode": "^1.105.0"
   },
@@ -12,7 +15,8 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:**/*"
+    "workspaceContains:**/*",
+    "onIssueReporterOpened"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -156,6 +160,11 @@
         "command": "session.bridge.entire.explain",
         "title": "Explain Session",
         "category": "Session Bridge (Entire)"
+      },
+      {
+        "command": "session.bridge.entire.reportIssue",
+        "title": "Report Issue",
+        "category": "Session Bridge (Entire)"
       }
     ],
     "menus": {
@@ -164,6 +173,11 @@
           "command": "session.bridge.entire.refresh",
           "when": "view =~ /^session\\.bridge\\.entire\\./",
           "group": "navigation"
+        },
+        {
+          "command": "session.bridge.entire.reportIssue",
+          "when": "view =~ /^session\\.bridge\\.entire\\./",
+          "group": "1_help"
         }
       ]
     }

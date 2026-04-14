@@ -1,0 +1,9 @@
+Extension logo/icon not visible in the extension marketplace
+
+---
+
+The icons must be pngs
+
+---
+
+Remove the svgs

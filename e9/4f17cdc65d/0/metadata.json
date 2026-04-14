@@ -1,0 +1,72 @@
+{
+  "cli_version": "0.5.5",
+  "checkpoint_id": "e94f17cdc65d",
+  "session_id": "cdb14b05-cceb-4354-a9d8-8c9182ece8bf",
+  "strategy": "manual-commit",
+  "created_at": "2026-04-14T15:38:04.936313Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "media/dark/history.svg",
+    "media/dark/play.svg",
+    "media/light/history.svg",
+    "media/light/play.svg",
+    "media/logo.svg",
+    "package.json"
+  ],
+  "agent": "Gemini CLI",
+  "model": "gemini-3-flash-preview",
+  "turn_id": "32ae7db87919",
+  "token_usage": {
+    "input_tokens": 1590137,
+    "cache_creation_tokens": 0,
+    "cache_read_tokens": 1343675,
+    "output_tokens": 5221,
+    "api_call_count": 36
+  },
+  "session_metrics": {
+    "turn_count": 1
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-04-14T15:38:04.930206Z",
+    "agent_lines": 0,
+    "agent_removed": 19,
+    "human_added": 0,
+    "human_modified": 11,
+    "human_removed": 0,
+    "total_committed": 0,
+    "total_lines_changed": 30,
+    "agent_percentage": 63.33333333333333,
+    "metric_version": 2
+  },
+  "prompt_attributions": [
+    {
+      "checkpoint_number": 1,
+      "user_lines_added": 271,
+      "user_lines_removed": 10,
+      "agent_lines_added": 0,
+      "agent_lines_removed": 0,
+      "user_added_per_file": {
+        "media/activity-bar-logo.svg": 22,
+        "media/logo.svg": 7,
+        "package.json": 4,
+        "src/entireCommand.ts": 238
+      },
+      "user_removed_per_file": {
+        "media/logo.svg": 7,
+        "package.json": 3
+      }
+    },
+    {
+      "checkpoint_number": 2,
+      "user_lines_added": 476,
+      "user_lines_removed": 0,
+      "agent_lines_added": 4,
+      "agent_lines_removed": 267,
+      "user_added_per_file": {
+        "src/EntireCommand.ts": 238,
+        "src/entireCommand.ts": 238
+      }
+    }
+  ]
+}

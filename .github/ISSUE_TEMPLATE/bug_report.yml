@@ -1,0 +1,59 @@
+name: Bug Report
+description: Report a bug to help us improve Session Bridge.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please fill out the information below to help us reproduce and fix it.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      placeholder: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Open a Git repository with Entire configured.
+        2. Click on ...
+        3. See error.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: input
+    id: vscode-version
+    attributes:
+      label: VS Code Version
+      placeholder: e.g., 1.105.0
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS Version
+      placeholder: e.g., macOS 14.4, Windows 11, Ubuntu 22.04
+    validations:
+      required: true
+  - type: input
+    id: cli-version
+    attributes:
+      label: Entire CLI Version
+      placeholder: e.g., 0.5.5
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Please provide any relevant logs from the "Session Bridge (Entire)" output channel.
+      render: shell

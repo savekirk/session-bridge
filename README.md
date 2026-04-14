@@ -1,74 +1,45 @@
 # Session Bridge
 
-Session Bridge is a VS Code extension for browsing Entire checkpoints and the committed sessions captured in those checkpoints from the current repository.
+> This is an **unofficial** VS Code extension. It is not developed by, endorsed by, or in any way related to the [Entire](https://entire.io) team.
+
+Session Bridge is an unofficial VS Code extension for browsing [Entire](https://entire.io) checkpoints and the committed sessions captured in those checkpoints from the current repository.
+
+## Requirements
+- Visual Studio Code `1.10` or newer (or editors compatible with VS Code `1.10+` APIs)
+- [Entire CLI](github.com/entireio/cli) version `0.5.5` or newer
+
+## Using the extension
+Session Bridge works with any git repository that has [Entire](https://docs.entire.io/introduction) configured to capture your AI agent sessions. You don't need to be logged in to your [Entire](https://entire.io) account to view your sessions. 
+
+Open any Entire managed git repository and the `Session Bridge (Entire)` status bar will show at the bottom. 
+
+Select or open the installed Session Bridge extension to view your checkpoints.
 
 ## Features
 
-- Browse committed checkpoints grouped by authored date.
-- Select a checkpoint to load only the sessions captured in that checkpoint.
-- Reuse checkpoint summary `sessionPaths` that were already resolved by the Checkpoints tree, so selecting a checkpoint does not reprocess the same checkpoint summary just to locate its session files again.
-- Keep the Sessions tree checkpoint-driven, so it only reflects the currently selected checkpoint instead of mixing in live-session state.
+- **Browse your committed checkpoints.**
+  ![Browse Checkpoints](media/demo/session-bridge-checkpoints.gif)
 
-For example if there is an image subfolder under your extension project workspace:
+- **View diffs of changes within a checkpoint.**
+  ![View Diffs](media/demo/session-bridge-view-diffs.gif)
 
-\!\[feature X\]\(images/feature-x.png\)
+- **View sessions within a selected checkpoint.**
+  ![List Active Sessions](media/demo/session-bridge-list-sessions.gif)
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+- **View details of a session.**
+  ![Session Details](media/demo/session-bridge-session-details.gif)
 
-## Requirements
+- **View status of active sessions.**
+  ![Active Sessions Status](media/demo/session-bridge-sessions-status.png)
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
-
-## Extension Settings
-
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
-This extension contributes the following settings:
-
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
+- **Run [Entire CLI](github.com/entireio/cli) commands**
 
 ## Known Issues
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+ - Some of the transcript might not be properly parsed.
 
 ## Release Notes
 
-Users appreciate release notes as you update your extension.
+### 0.0.1
 
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Following extension guidelines
-
-Ensure that you've read through the extensions guidelines and follow the best practices for creating your extension.
-
-* [Extension Guidelines](https://code.visualstudio.com/api/references/extension-guidelines)
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+Initial release

@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.2] - 2026-04-14
+
+### Fixed
+- Fixed missing extension icon in the VS Code Marketplace by adding the top-level `icon` field to `package.json`.
+- Converted all extension icons from SVG to PNG format to ensure compatibility with the VS Code Marketplace.
+
+### Changed
+- Replaced themed SVGs with PNG versions for the marketplace icon, activity bar, and tree view icons.
+- Removed original SVG icon files from the repository.
+
 ## [0.0.1] - 2026-04-14
 
 - Initial release of Session Bridge for Entire.

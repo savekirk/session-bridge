@@ -2,7 +2,7 @@
   "name": "session-bridge",
   "displayName": "Session Bridge",
   "description": "Unofficial VSCode extension for inspecting and managing Entire sessions and checkpoints",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "kirk-agbenyegah",
   "repository": "https://github.com/savekirk/session-bridge",
   "bugs": {
@@ -14,6 +14,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "media/logo.png",
   "activationEvents": [
     "workspaceContains:**/*",
     "onIssueReporterOpened"
@@ -25,7 +26,7 @@
         {
           "id": "session-bridge",
           "title": "Session Bridge for Entire",
-          "icon": "media/logo.svg"
+          "icon": "media/activity-bar-logo.png"
         }
       ]
     },
@@ -34,12 +35,12 @@
         {
           "id": "session.bridge.entire.checkpoints",
           "name": "Checkpoints",
-          "icon": "media/dark/history.svg"
+          "icon": "media/dark/history.png"
         },
         {
           "id": "session.bridge.entire.sessions",
           "name": "Checkpoint Sessions",
-          "icon": "media/dark/history.svg"
+          "icon": "media/dark/history.png"
         }
       ]
     },

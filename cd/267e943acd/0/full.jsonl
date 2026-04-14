@@ -1,0 +1,649 @@
+{
+  "sessionId": "d0ed8c54-d24e-4ca5-b7ff-2f2b943c0d2d",
+  "projectHash": "40fc80fdb16b14b32f87f5955bf238c9ccf0836dc64373944adebc306d9cf157",
+  "startTime": "2026-04-14T09:55:12.541Z",
+  "lastUpdated": "2026-04-14T10:08:39.017Z",
+  "messages": [
+    {
+      "id": "65c9c088-56f3-42db-9f37-af7bf8f98803",
+      "timestamp": "2026-04-14T09:55:26.451Z",
+      "type": "user",
+      "content": [
+        {
+          "text": "Add a contribution guide"
+        }
+      ]
+    },
+    {
+      "id": "91c4aa01-8a07-42a6-b0f3-de813a23a750",
+      "timestamp": "2026-04-14T09:55:31.785Z",
+      "type": "gemini",
+      "content": "I will start by reading `AGENTS.md`, `README.md`, and `package.json` to gather the necessary information for the contribution guide.",
+      "thoughts": [
+        {
+          "subject": "Examining Project Documentation",
+          "description": "I've located `AGENTS.md`, which has some existing guidance. I'm reviewing it to understand how to best incorporate the user's requirements into a new `CONTRIBUTING.md` file and ensure consistency.",
+          "timestamp": "2026-04-14T09:55:30.015Z"
+        },
+        {
+          "subject": "Defining Contribution Strategy",
+          "description": "I've digested the existing guidelines within `AGENTS.md` and have begun to extract relevant points for the new `CONTRIBUTING.md` file. Next, I'll dive into the `README.md` to see if it provides any other useful clues, before moving onto the `package.json` to get an overview of the development workflow.",
+          "timestamp": "2026-04-14T09:55:31.632Z"
+        }
+      ],
+      "tokens": {
+        "input": 19553,
+        "output": 72,
+        "cached": 0,
+        "thoughts": 269,
+        "tool": 0,
+        "total": 19894
+      },
+      "model": "gemini-3-flash-preview",
+      "toolCalls": [
+        {
+          "id": "read_file_1776160531737_0",
+          "name": "read_file",
+          "args": {
+            "file_path": "AGENTS.md"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "read_file_1776160531737_0",
+                "name": "read_file",
+                "response": {
+                  "output": "# Repository Guidelines\n\n## Project Structure & Module Organization\n`src/extension.ts` is the extension entrypoint and wires activation, commands, and views. `src/components/` contains UI-facing providers and panels such as the status bar item, checkpoint tree, and active session tree. `src/checkpoints/` holds the session/checkpoint domain logic, git enrichment, storage, transcript parsing, and search helpers. General utilities live in top-level `src/*.ts` files such as `workspaceProbe.ts` and `runCommand.ts`. Tests live under `src/test/`, with reusable checkpoint fixtures in `src/test/checkpoints/fixtures/`. `media/` stores extension icons. Treat `dist/` and `out/` as generated output.\n\n## Build, Test, and Development Commands\n- `pnpm compile`: run type-checking, ESLint, and the esbuild bundle into `dist/extension.js`.\n- `pnpm watch`: run esbuild watch mode and `tsc --watch` together for local development.\n- `pnpm check-types`: run strict TypeScript checks only.\n- `pnpm lint`: lint `src/` with the repository ESLint config.\n- `pnpm test`: compile tests, rebuild the extension, and run the VS Code test harness.\n- `pnpm package`: build the production bundle used for publishing.\n\n## Coding Style & Naming Conventions\nUse strict TypeScript and follow the existing code style: tabs for indentation, semicolons, and mostly single-quoted imports/strings. Use `PascalCase` for classes, providers, and exported types; use `camelCase` for functions and locals; use `UPPER_SNAKE_CASE` for extension-wide constants. Keep command and context identifiers namespaced, for example `session.bridge.entire.refresh`. Let ESLint catch small consistency issues, and do not hand-edit generated files in `dist/` or `out/`.\n\n## Testing Guidelines\nWrite tests as `*.test.ts` under `src/test/`, mirroring the feature area when possible, such as `src/test/checkpoints/`. This project uses Mocha with `@vscode/test-cli` and `vscode-test`, compiling test files to `out/test/**/*.test.js`. Prefer fixture-backed tests for checkpoint parsing, git metadata joins, and tree/detail view models. No formal coverage threshold is configured, but every behavior change should include or update targeted tests.\n\n## Commit & Pull Request Guidelines\nRecent history uses short, imperative commit subjects, sometimes with lightweight prefixes such as `feat:` or `refactor:`. Keep each commit focused on one change and describe behavior, not process. Pull requests should summarize the user-visible effect, list verification commands run, link the relevant issue when applicable, and include screenshots or recordings for tree view, panel, or status bar changes.\n\n## Configuration Notes\nThis extension targets VS Code `^1.105.0` and assumes an Entire-enabled Git repository at runtime. For tests and local development, prefer checked-in fixtures and mocks over machine-specific `.entire` state or hard-coded paths.\n"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T09:55:31.895Z",
+          "resultDisplay": "",
+          "description": "AGENTS.md",
+          "displayName": "ReadFile",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "read_file_1776160531759_1",
+          "name": "read_file",
+          "args": {
+            "file_path": "README.md"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "read_file_1776160531759_1",
+                "name": "read_file",
+                "response": {
+                  "output": "# Session Bridge\n\n> This is an **unofficial** VS Code extension. It is not developed by, endorsed by, or in any way related to the [Entire](https://entire.io) team.\n\nSession Bridge is an unofficial VS Code extension for browsing [Entire](https://entire.io) checkpoints and the committed sessions captured in those checkpoints from the current repository.\n\n## Requirements\n- Visual Studio Code `1.10` or newer (or editors compatible with VS Code `1.10+` APIs)\n- [Entire CLI](github.com/entireio/cli) version `0.5.5` or newer\n\n## Using the extension\nSession Bridge works with any git repository that has [Entire](https://docs.entire.io/introduction) configured to capture your AI agent sessions. You don't need to be logged in to your [Entire](https://entire.io) account to view your sessions. \n\nOpen any Entire managed git repository and the `Session Bridge (Entire)` status bar will show at the bottom. \n\nSelect or open the installed Session Bridge extension to view your checkpoints.\n\n## Features\n\n- **Browse your committed checkpoints.**\n  ![Browse Checkpoints](media/demo/session-bridge-checkpoints.gif)\n\n- **View diffs of changes within a checkpoint.**\n  ![View Diffs](media/demo/session-bridge-view-diffs.gif)\n\n- **View sessions within a selected checkpoint.**\n  ![List Active Sessions](media/demo/session-bridge-list-sessions.gif)\n\n- **View details of a session.**\n  ![Session Details](media/demo/session-bridge-session-details.gif)\n\n- **View status of active sessions.**\n  ![Active Sessions Status](media/demo/session-bridge-sessions-status.png)\n\n- **Run [Entire CLI](github.com/entireio/cli) commands**\n\n## Known Issues\n\n - Some of the transcript might not be properly parsed.\n\n## Release Notes\n\n### 0.0.1\n\nInitial release"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T09:55:31.895Z",
+          "resultDisplay": "",
+          "description": "README.md",
+          "displayName": "ReadFile",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "read_file_1776160531785_2",
+          "name": "read_file",
+          "args": {
+            "file_path": "package.json"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "read_file_1776160531785_2",
+                "name": "read_file",
+                "response": {
+                  "output": "{\n  \"name\": \"session-bridge\",\n  \"displayName\": \"Session Bridge\",\n  \"description\": \"Unofficial VSCode extension for inspecting and managing Entire sessions and checkpoints\",\n  \"version\": \"0.0.1\",\n  \"publisher\": \"kirk-agbenyegah\",\n  \"repository\": \"https://github.com/savekirk/session-bridge\",\n  \"bugs\": {\n    \"url\": \"https://github.com/savekirk/session-bridge/issues\"\n  },\n  \"engines\": {\n    \"vscode\": \"^1.105.0\"\n  },\n  \"categories\": [\n    \"Other\"\n  ],\n  \"activationEvents\": [\n    \"workspaceContains:**/*\",\n    \"onIssueReporterOpened\"\n  ],\n  \"main\": \"./dist/extension.js\",\n  \"contributes\": {\n    \"viewsContainers\": {\n      \"activitybar\": [\n        {\n          \"id\": \"session-bridge\",\n          \"title\": \"Session Bridge for Entire\",\n          \"icon\": \"media/logo.svg\"\n        }\n      ]\n    },\n    \"views\": {\n      \"session-bridge\": [\n        {\n          \"id\": \"session.bridge.entire.checkpoints\",\n          \"name\": \"Checkpoints\",\n          \"icon\": \"media/dark/history.svg\"\n        },\n        {\n          \"id\": \"session.bridge.entire.sessions\",\n          \"name\": \"Checkpoint Sessions\",\n          \"icon\": \"media/dark/history.svg\"\n        }\n      ]\n    },\n    \"viewsWelcome\": [\n      {\n        \"view\": \"session.bridge.entire.checkpoints\",\n        \"when\": \"gitOpenRepositoryCount == 0\",\n        \"contents\": \"Open a Git repository to view Entire checkpoints.\\n[Open Folder](command:vscode.openFolder)\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n      },\n      {\n        \"view\": \"session.bridge.entire.checkpoints\",\n        \"when\": \"gitOpenRepositoryCount != 0 && session.bridge.state.cli-missing\",\n        \"contents\": \"The Entire CLI is not available in the extension host environment.\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n      },\n      {\n        \"view\": \"session.bridge.entire.checkpoints\",\n        \"when\": \"gitOpenRepositoryCount != 0 && session.bridge.state.not-git-repo\",\n        \"contents\": \"Entire features require a Git repository.\\n[Open Folder](command:vscode.openFolder)\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n      },\n      {\n        \"view\": \"session.bridge.entire.checkpoints\",\n        \"when\": \"gitOpenRepositoryCount != 0 && session.bridge.state.disabled\",\n        \"contents\": \"Entire is not enabled for this repository.\\n[Enable In Repository](command:session.bridge.entire.enable)\\nTo learn more about Entire [read the docs](https://docs.entire.io)\"\n      },\n      {\n        \"view\": \"session.bridge.entire.sessions\",\n        \"when\": \"session.bridge.state.not-git-repo\",\n        \"contents\": \"Open a Git repository to see checkpoint sessions.\"\n      },\n      {\n        \"view\": \"session.bridge.entire.sessions\",\n        \"when\": \"session.bridge.state.cli-missing\",\n        \"contents\": \"Checkpoint sessions will appear here after Entire is installed and enabled.\"\n      },\n      {\n        \"view\": \"session.bridge.entire.sessions\",\n        \"when\": \"session.bridge.state.disabled\",\n        \"contents\": \"Checkpoint sessions will appear here after Entire is enabled.\"\n      },\n      {\n        \"view\": \"session.bridge.entire.sessions\",\n        \"when\": \"session.bridge.state.enabled\",\n        \"contents\": \"Select a checkpoint to inspect only the sessions captured in that checkpoint.\\n[Refresh session state](command:session.bridge.entire.refresh)\"\n      },\n      {\n        \"view\": \"session.bridge.entire.checkpoints\",\n        \"when\": \"session.bridge.state.enabled\",\n        \"contents\": \"No checkpoints on this branch.\\n[Refresh checkpoint state](command:session.bridge.entire.refresh)\"\n      }\n    ],\n    \"commands\": [\n      {\n        \"command\": \"session.bridge.entire.showStatus\",\n        \"title\": \"Show Status\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.enable\",\n        \"title\": \"Enable In Repository\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.disable\",\n        \"title\": \"Disable In Repository\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.refresh\",\n        \"title\": \"Refresh\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.fetchCheckpointBranch\",\n        \"title\": \"Fetch Checkpoint Branch\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.browseCheckpoints\",\n        \"title\": \"Browse Checkpoints\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.clean\",\n        \"title\": \"Clean Entire State\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.reset\",\n        \"title\": \"Reset Entire Session Data\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.showTrace\",\n        \"title\": \"Show Trace\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.configure\",\n        \"title\": \"Configure Entire\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.doctor\",\n        \"title\": \"Run Doctor\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.resume\",\n        \"title\": \"Resume Session\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.rewind\",\n        \"title\": \"Rewind Session\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.explain\",\n        \"title\": \"Explain Session\",\n        \"category\": \"Session Bridge (Entire)\"\n      },\n      {\n        \"command\": \"session.bridge.entire.reportIssue\",\n        \"title\": \"Report Issue\",\n        \"category\": \"Session Bridge (Entire)\"\n      }\n    ],\n    \"menus\": {\n      \"view/title\": [\n        {\n          \"command\": \"session.bridge.entire.refresh\",\n          \"when\": \"view =~ /^session\\\\.bridge\\\\.entire\\\\./\",\n          \"group\": \"navigation\"\n        },\n        {\n          \"command\": \"session.bridge.entire.reportIssue\",\n          \"when\": \"view =~ /^session\\\\.bridge\\\\.entire\\\\./\",\n          \"group\": \"1_help\"\n        }\n      ]\n    }\n  },\n  \"scripts\": {\n    \"vscode:prepublish\": \"pnpm run package\",\n    \"compile\": \"pnpm run check-types && pnpm run lint && node esbuild.js\",\n    \"watch\": \"npm-run-all -p watch:*\",\n    \"watch:esbuild\": \"node esbuild.js --watch\",\n    \"watch:tsc\": \"tsc --noEmit --watch --project tsconfig.json\",\n    \"package\": \"pnpm run check-types && pnpm run lint && node esbuild.js --production\",\n    \"compile-tests\": \"node -e \\\"require('node:fs').rmSync('out', { recursive: true, force: true })\\\" && tsc -p . --outDir out\",\n    \"watch-tests\": \"tsc -p . -w --outDir out\",\n    \"pretest\": \"pnpm run compile-tests && pnpm run compile && pnpm run lint\",\n    \"check-types\": \"tsc --noEmit\",\n    \"lint\": \"eslint src\",\n    \"test\": \"vscode-test\"\n  },\n  \"devDependencies\": {\n    \"@types/vscode\": \"1.105.0\",\n    \"@types/mocha\": \"^10.0.10\",\n    \"@types/node\": \"22.x\",\n    \"typescript-eslint\": \"^8.56.1\",\n    \"eslint\": \"^9.39.3\",\n    \"esbuild\": \"^0.27.3\",\n    \"npm-run-all\": \"^4.1.5\",\n    \"typescript\": \"^5.9.3\",\n    \"@vscode/test-cli\": \"^0.0.12\",\n    \"@vscode/test-electron\": \"^2.5.2\"\n  }\n}"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T09:55:31.895Z",
+          "resultDisplay": "",
+          "description": "package.json",
+          "displayName": "ReadFile",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "7697d6db-be31-4ba9-9fbc-2a27a30a4a31",
+      "timestamp": "2026-04-14T09:55:49.675Z",
+      "type": "gemini",
+      "content": "I will now create a comprehensive `CONTRIBUTING.md` file, incorporating the project's structure, development workflow, coding standards, and testing guidelines.",
+      "thoughts": [
+        {
+          "subject": "Structuring the Documentation",
+          "description": "\\n\\n\n\nI'm currently outlining the `CONTRIBUTING.md` file. I've pinpointed the project structure, noting the key directories like `src/extension.ts`, `src/components/`, `src/checkpoints/`, and `src/test/`, which should provide enough context for collaborators. I've also identified the standard `pnpm compile` process. Next, I plan to detail the contribution guidelines.",
+          "timestamp": "2026-04-14T09:55:34.580Z"
+        },
+        {
+          "subject": "Composing the File",
+          "description": "\\n\\n\n\nNow that I've amassed all the critical details, I'm ready to draft the `CONTRIBUTING.md` file. I'll structure it to mirror the outline I've just compiled: project structure, development workflow, coding style, testing methodology, commit/PR guidelines, and the technology stack. I'll make sure to be clear and concise, providing practical information for contributors.",
+          "timestamp": "2026-04-14T09:55:35.737Z"
+        }
+      ],
+      "tokens": {
+        "input": 22885,
+        "output": 1003,
+        "cached": 18073,
+        "thoughts": 249,
+        "tool": 0,
+        "total": 24137
+      },
+      "model": "gemini-3-flash-preview",
+      "toolCalls": [
+        {
+          "id": "write_file_1776160549675_0",
+          "name": "write_file",
+          "args": {
+            "file_path": "CONTRIBUTING.md",
+            "content": "# Contributing to Session Bridge\n\nThank you for your interest in contributing to Session Bridge! This guide will help you get started with the project and understand our development process.\n\n## Getting Started\n\n### Prerequisites\n\n- [Node.js](https://nodejs.org/) (latest LTS recommended)\n- [pnpm](https://pnpm.io/) for package management\n- [VS Code](https://code.visualstudio.com/) for development\n- [Entire CLI](https://github.com/entireio/cli) (v0.5.5 or newer) installed on your system\n\n### Installation\n\n1. Clone the repository:\n   ```bash\n   git clone https://github.com/savekirk/session-bridge.git\n   cd session-bridge\n   ```\n\n2. Install dependencies:\n   ```bash\n   pnpm install\n   ```\n\n## Development Workflow\n\n### Build Commands\n\nWe use `pnpm` for all development tasks. Key scripts include:\n\n- `pnpm compile`: Performs type-checking, linting, and bundles the extension into `dist/extension.js`.\n- `pnpm watch`: Runs esbuild and TypeScript in watch mode for local development.\n- `pnpm check-types`: Runs strict TypeScript checks only.\n- `pnpm lint`: Lints the `src/` directory using our ESLint configuration.\n- `pnpm package`: Builds the production bundle used for publishing.\n\n### Running the Extension Locally\n\n1. Open the project in VS Code.\n2. Press `F5` or go to the \"Run and Debug\" view and select \"Run Extension\".\n3. A new VS Code window (Extension Development Host) will open with the extension loaded.\n\n## Project Structure\n\n- `src/extension.ts`: Extension entry point, command registration, and view wiring.\n- `src/components/`: UI-facing providers and panels (Status Bar, Tree Views, Panels).\n- `src/checkpoints/`: Core domain logic for sessions, checkpoints, Git enrichment, and storage.\n- `src/test/`: Test suites, mirrored to the source structure.\n- `media/`: Extension icons and demo assets.\n- `dist/` and `out/`: Generated build and test outputs (ignored by Git).\n\n## Coding Standards\n\nWe follow strict TypeScript and specific formatting conventions:\n\n- **Indentation**: Use **tabs** for indentation.\n- **Quotes**: Use **single quotes** for imports and strings unless escaping is necessary.\n- **Semicolons**: Always use semicolons.\n- **Naming Conventions**:\n  - `PascalCase` for classes, providers, and exported types.\n  - `camelCase` for functions and local variables.\n  - `UPPER_SNAKE_CASE` for extension-wide constants.\n- **Namespacing**: Commands and context identifiers should be namespaced (e.g., `session.bridge.entire.refresh`).\n\n## Testing Guidelines\n\nEvery bug fix or new feature should include or update targeted tests.\n\n- **Location**: Write tests as `*.test.ts` under `src/test/`, mirroring the `src/` structure.\n- **Framework**: We use Mocha with `@vscode/test-cli`.\n- **Running Tests**: Run `pnpm test` to compile tests, rebuild the extension, and execute the VS Code test harness.\n- **Fixtures**: Prefer fixture-backed tests for complex logic like checkpoint parsing or Git metadata joins. Existing fixtures are located in `src/test/checkpoints/fixtures/`.\n\n## Commit and Pull Request Guidelines\n\n### Commit Messages\n\n- Use short, imperative subjects (e.g., `feat: add session search`).\n- Use lightweight prefixes like `feat:`, `fix:`, `refactor:`, or `docs:`.\n- Focus on the **why** of the change rather than the process.\n\n### Pull Requests\n\n- Summarize the user-visible effect of the change.\n- List the verification steps or commands run.\n- Link relevant issues if applicable.\n- **UI Changes**: Include screenshots or recordings if the PR modifies tree views, panels, or the status bar.\n\n## Reporting Issues\n\nUse the [GitHub Issues](https://github.com/savekirk/session-bridge/issues) page to report bugs or suggest features. When reporting a bug, please include:\n- A clear description of the issue.\n- Steps to reproduce.\n- Your OS and VS Code version.\n- Entire CLI version.\n"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "write_file_1776160549675_0",
+                "name": "write_file",
+                "response": {
+                  "output": "Successfully created and wrote to new file: /Users/savekirk/dev/ai/entire/session-bridge/CONTRIBUTING.md. Here is the updated code:\n# Contributing to Session Bridge\n\nThank you for your interest in contributing to Session Bridge! This guide will help you get started with the project and understand our development process.\n\n## Getting Started\n\n### Prerequisites\n\n- [Node.js](https://nodejs.org/) (latest LTS recommended)\n- [pnpm](https://pnpm.io/) for package management\n- [VS Code](https://code.visualstudio.com/) for development\n- [Entire CLI](https://github.com/entireio/cli) (v0.5.5 or newer) installed on your system\n\n### Installation\n\n1. Clone the repository:\n   ```bash\n   git clone https://github.com/savekirk/session-bridge.git\n   cd session-bridge\n   ```\n\n2. Install dependencies:\n   ```bash\n   pnpm install\n   ```\n\n## Development Workflow\n\n### Build Commands\n\nWe use `pnpm` for all development tasks. Key scripts include:\n\n- `pnpm compile`: Performs type-checking, linting, and bundles the extension into `dist/extension.js`.\n- `pnpm watch`: Runs esbuild and TypeScript in watch mode for local development.\n- `pnpm check-types`: Runs strict TypeScript checks only.\n- `pnpm lint`: Lints the `src/` directory using our ESLint configuration.\n- `pnpm package`: Builds the production bundle used for publishing.\n\n### Running the Extension Locally\n\n1. Open the project in VS Code.\n2. Press `F5` or go to the \"Run and Debug\" view and select \"Run Extension\".\n3. A new VS Code window (Extension Development Host) will open with the extension loaded.\n\n## Project Structure\n\n- `src/extension.ts`: Extension entry point, command registration, and view wiring.\n- `src/components/`: UI-facing providers and panels (Status Bar, Tree Views, Panels).\n- `src/checkpoints/`: Core domain logic for sessions, checkpoints, Git enrichment, and storage.\n- `src/test/`: Test suites, mirrored to the source structure.\n- `media/`: Extension icons and demo assets.\n- `dist/` and `out/`: Generated build and test outputs (ignored by Git).\n\n## Coding Standards\n\nWe follow strict TypeScript and specific formatting conventions:\n\n- **Indentation**: Use **tabs** for indentation.\n- **Quotes**: Use **single quotes** for imports and strings unless escaping is necessary.\n- **Semicolons**: Always use semicolons.\n- **Naming Conventions**:\n  - `PascalCase` for classes, providers, and exported types.\n  - `camelCase` for functions and local variables.\n  - `UPPER_SNAKE_CASE` for extension-wide constants.\n- **Namespacing**: Commands and context identifiers should be namespaced (e.g., `session.bridge.entire.refresh`).\n\n## Testing Guidelines\n\nEvery bug fix or new feature should include or update targeted tests.\n\n- **Location**: Write tests as `*.test.ts` under `src/test/`, mirroring the `src/` structure.\n- **Framework**: We use Mocha with `@vscode/test-cli`.\n- **Running Tests**: Run `pnpm test` to compile tests, rebuild the extension, and execute the VS Code test harness.\n- **Fixtures**: Prefer fixture-backed tests for complex logic like checkpoint parsing or Git metadata joins. Existing fixtures are located in `src/test/checkpoints/fixtures/`.\n\n## Commit and Pull Request Guidelines\n\n### Commit Messages\n\n- Use short, imperative subjects (e.g., `feat: add session search`).\n- Use lightweight prefixes like `feat:`, `fix:`, `refactor:`, or `docs:`.\n- Focus on the **why** of the change rather than the process.\n\n### Pull Requests\n\n- Summarize the user-visible effect of the change.\n- List the verification steps or commands run.\n- Link relevant issues if applicable.\n- **UI Changes**: Include screenshots or recordings if the PR modifies tree views, panels, or the status bar.\n\n## Reporting Issues\n\nUse the [GitHub Issues](https://github.com/savekirk/session-bridge/issues) page to report bugs or suggest features. When reporting a bug, please include:\n- A clear description of the issue.\n- Steps to reproduce.\n- Your OS and VS Code version.\n- Entire CLI version.\n"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T09:55:49.741Z",
+          "resultDisplay": {
+            "fileDiff": "Index: CONTRIBUTING.md\n===================================================================\n--- CONTRIBUTING.md\tOriginal\n+++ CONTRIBUTING.md\tWritten\n@@ -0,0 +1,97 @@\n+# Contributing to Session Bridge\n+\n+Thank you for your interest in contributing to Session Bridge! This guide will help you get started with the project and understand our development process.\n+\n+## Getting Started\n+\n+### Prerequisites\n+\n+- [Node.js](https://nodejs.org/) (latest LTS recommended)\n+- [pnpm](https://pnpm.io/) for package management\n+- [VS Code](https://code.visualstudio.com/) for development\n+- [Entire CLI](https://github.com/entireio/cli) (v0.5.5 or newer) installed on your system\n+\n+### Installation\n+\n+1. Clone the repository:\n+   ```bash\n+   git clone https://github.com/savekirk/session-bridge.git\n+   cd session-bridge\n+   ```\n+\n+2. Install dependencies:\n+   ```bash\n+   pnpm install\n+   ```\n+\n+## Development Workflow\n+\n+### Build Commands\n+\n+We use `pnpm` for all development tasks. Key scripts include:\n+\n+- `pnpm compile`: Performs type-checking, linting, and bundles the extension into `dist/extension.js`.\n+- `pnpm watch`: Runs esbuild and TypeScript in watch mode for local development.\n+- `pnpm check-types`: Runs strict TypeScript checks only.\n+- `pnpm lint`: Lints the `src/` directory using our ESLint configuration.\n+- `pnpm package`: Builds the production bundle used for publishing.\n+\n+### Running the Extension Locally\n+\n+1. Open the project in VS Code.\n+2. Press `F5` or go to the \"Run and Debug\" view and select \"Run Extension\".\n+3. A new VS Code window (Extension Development Host) will open with the extension loaded.\n+\n+## Project Structure\n+\n+- `src/extension.ts`: Extension entry point, command registration, and view wiring.\n+- `src/components/`: UI-facing providers and panels (Status Bar, Tree Views, Panels).\n+- `src/checkpoints/`: Core domain logic for sessions, checkpoints, Git enrichment, and storage.\n+- `src/test/`: Test suites, mirrored to the source structure.\n+- `media/`: Extension icons and demo assets.\n+- `dist/` and `out/`: Generated build and test outputs (ignored by Git).\n+\n+## Coding Standards\n+\n+We follow strict TypeScript and specific formatting conventions:\n+\n+- **Indentation**: Use **tabs** for indentation.\n+- **Quotes**: Use **single quotes** for imports and strings unless escaping is necessary.\n+- **Semicolons**: Always use semicolons.\n+- **Naming Conventions**:\n+  - `PascalCase` for classes, providers, and exported types.\n+  - `camelCase` for functions and local variables.\n+  - `UPPER_SNAKE_CASE` for extension-wide constants.\n+- **Namespacing**: Commands and context identifiers should be namespaced (e.g., `session.bridge.entire.refresh`).\n+\n+## Testing Guidelines\n+\n+Every bug fix or new feature should include or update targeted tests.\n+\n+- **Location**: Write tests as `*.test.ts` under `src/test/`, mirroring the `src/` structure.\n+- **Framework**: We use Mocha with `@vscode/test-cli`.\n+- **Running Tests**: Run `pnpm test` to compile tests, rebuild the extension, and execute the VS Code test harness.\n+- **Fixtures**: Prefer fixture-backed tests for complex logic like checkpoint parsing or Git metadata joins. Existing fixtures are located in `src/test/checkpoints/fixtures/`.\n+\n+## Commit and Pull Request Guidelines\n+\n+### Commit Messages\n+\n+- Use short, imperative subjects (e.g., `feat: add session search`).\n+- Use lightweight prefixes like `feat:`, `fix:`, `refactor:`, or `docs:`.\n+- Focus on the **why** of the change rather than the process.\n+\n+### Pull Requests\n+\n+- Summarize the user-visible effect of the change.\n+- List the verification steps or commands run.\n+- Link relevant issues if applicable.\n+- **UI Changes**: Include screenshots or recordings if the PR modifies tree views, panels, or the status bar.\n+\n+## Reporting Issues\n+\n+Use the [GitHub Issues](https://github.com/savekirk/session-bridge/issues) page to report bugs or suggest features. When reporting a bug, please include:\n+- A clear description of the issue.\n+- Steps to reproduce.\n+- Your OS and VS Code version.\n+- Entire CLI version.\n",
+            "fileName": "CONTRIBUTING.md",
+            "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/CONTRIBUTING.md",
+            "originalContent": "",
+            "newContent": "# Contributing to Session Bridge\n\nThank you for your interest in contributing to Session Bridge! This guide will help you get started with the project and understand our development process.\n\n## Getting Started\n\n### Prerequisites\n\n- [Node.js](https://nodejs.org/) (latest LTS recommended)\n- [pnpm](https://pnpm.io/) for package management\n- [VS Code](https://code.visualstudio.com/) for development\n- [Entire CLI](https://github.com/entireio/cli) (v0.5.5 or newer) installed on your system\n\n### Installation\n\n1. Clone the repository:\n   ```bash\n   git clone https://github.com/savekirk/session-bridge.git\n   cd session-bridge\n   ```\n\n2. Install dependencies:\n   ```bash\n   pnpm install\n   ```\n\n## Development Workflow\n\n### Build Commands\n\nWe use `pnpm` for all development tasks. Key scripts include:\n\n- `pnpm compile`: Performs type-checking, linting, and bundles the extension into `dist/extension.js`.\n- `pnpm watch`: Runs esbuild and TypeScript in watch mode for local development.\n- `pnpm check-types`: Runs strict TypeScript checks only.\n- `pnpm lint`: Lints the `src/` directory using our ESLint configuration.\n- `pnpm package`: Builds the production bundle used for publishing.\n\n### Running the Extension Locally\n\n1. Open the project in VS Code.\n2. Press `F5` or go to the \"Run and Debug\" view and select \"Run Extension\".\n3. A new VS Code window (Extension Development Host) will open with the extension loaded.\n\n## Project Structure\n\n- `src/extension.ts`: Extension entry point, command registration, and view wiring.\n- `src/components/`: UI-facing providers and panels (Status Bar, Tree Views, Panels).\n- `src/checkpoints/`: Core domain logic for sessions, checkpoints, Git enrichment, and storage.\n- `src/test/`: Test suites, mirrored to the source structure.\n- `media/`: Extension icons and demo assets.\n- `dist/` and `out/`: Generated build and test outputs (ignored by Git).\n\n## Coding Standards\n\nWe follow strict TypeScript and specific formatting conventions:\n\n- **Indentation**: Use **tabs** for indentation.\n- **Quotes**: Use **single quotes** for imports and strings unless escaping is necessary.\n- **Semicolons**: Always use semicolons.\n- **Naming Conventions**:\n  - `PascalCase` for classes, providers, and exported types.\n  - `camelCase` for functions and local variables.\n  - `UPPER_SNAKE_CASE` for extension-wide constants.\n- **Namespacing**: Commands and context identifiers should be namespaced (e.g., `session.bridge.entire.refresh`).\n\n## Testing Guidelines\n\nEvery bug fix or new feature should include or update targeted tests.\n\n- **Location**: Write tests as `*.test.ts` under `src/test/`, mirroring the `src/` structure.\n- **Framework**: We use Mocha with `@vscode/test-cli`.\n- **Running Tests**: Run `pnpm test` to compile tests, rebuild the extension, and execute the VS Code test harness.\n- **Fixtures**: Prefer fixture-backed tests for complex logic like checkpoint parsing or Git metadata joins. Existing fixtures are located in `src/test/checkpoints/fixtures/`.\n\n## Commit and Pull Request Guidelines\n\n### Commit Messages\n\n- Use short, imperative subjects (e.g., `feat: add session search`).\n- Use lightweight prefixes like `feat:`, `fix:`, `refactor:`, or `docs:`.\n- Focus on the **why** of the change rather than the process.\n\n### Pull Requests\n\n- Summarize the user-visible effect of the change.\n- List the verification steps or commands run.\n- Link relevant issues if applicable.\n- **UI Changes**: Include screenshots or recordings if the PR modifies tree views, panels, or the status bar.\n\n## Reporting Issues\n\nUse the [GitHub Issues](https://github.com/savekirk/session-bridge/issues) page to report bugs or suggest features. When reporting a bug, please include:\n- A clear description of the issue.\n- Steps to reproduce.\n- Your OS and VS Code version.\n- Entire CLI version.\n",
+            "diffStat": {
+              "model_added_lines": 97,
+              "model_removed_lines": 0,
+              "model_added_chars": 3720,
+              "model_removed_chars": 0,
+              "user_added_lines": 0,
+              "user_removed_lines": 0,
+              "user_added_chars": 0,
+              "user_removed_chars": 0
+            },
+            "isNewFile": true
+          },
+          "description": "Writing to CONTRIBUTING.md",
+          "displayName": "WriteFile",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "5b227bcb-ee89-4581-aa18-5d4291b4f37a",
+      "timestamp": "2026-04-14T09:55:54.228Z",
+      "type": "gemini",
+      "content": "I will now add a \"Contributing\" section to the `README.md` and link it to the newly created `CONTRIBUTING.md` file.",
+      "thoughts": [
+        {
+          "subject": "Linking Documentation Now",
+          "description": "I've just added the \"Contributing\" section to my `README.md` file. It's now linked to the new `CONTRIBUTING.md` file. Feels good to have that completed and documented!",
+          "timestamp": "2026-04-14T09:55:53.236Z"
+        }
+      ],
+      "tokens": {
+        "input": 24880,
+        "output": 132,
+        "cached": 21359,
+        "thoughts": 45,
+        "tool": 0,
+        "total": 25057
+      },
+      "model": "gemini-3-flash-preview",
+      "toolCalls": [
+        {
+          "id": "replace_1776160554228_0",
+          "name": "replace",
+          "args": {
+            "file_path": "README.md",
+            "new_string": "### 0.0.1\n\nInitial release\n\n## Contributing\n\nContributions are welcome! Please see our [Contribution Guide](CONTRIBUTING.md) for details on how to get started, coding standards, and our development workflow.\n",
+            "old_string": "### 0.0.1\n\nInitial release\n",
+            "instruction": "Add a Contributing section to the end of the README.md linking to CONTRIBUTING.md.",
+            "allow_multiple": false
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "replace_1776160554228_0",
+                "name": "replace",
+                "response": {
+                  "output": "Successfully modified file: /Users/savekirk/dev/ai/entire/session-bridge/README.md (1 replacements). Here is the updated code:\n...\n\n## Release Notes\n\n### 0.0.1\n\nInitial release\n\n## Contributing\n\nContributions are welcome! Please see our [Contribution Guide](CONTRIBUTING.md) for details on how to get started, coding standards, and our development workflow."
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T09:55:54.294Z",
+          "resultDisplay": {
+            "fileDiff": "Index: README.md\n===================================================================\n--- README.md\tCurrent\n+++ README.md\tProposed\n@@ -42,4 +42,8 @@\n \n ### 0.0.1\n \n-Initial release\n\\ No newline at end of file\n+Initial release\n+\n+## Contributing\n+\n+Contributions are welcome! Please see our [Contribution Guide](CONTRIBUTING.md) for details on how to get started, coding standards, and our development workflow.\n\\ No newline at end of file\n",
+            "fileName": "README.md",
+            "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/README.md",
+            "originalContent": "# Session Bridge\n\n> This is an **unofficial** VS Code extension. It is not developed by, endorsed by, or in any way related to the [Entire](https://entire.io) team.\n\nSession Bridge is an unofficial VS Code extension for browsing [Entire](https://entire.io) checkpoints and the committed sessions captured in those checkpoints from the current repository.\n\n## Requirements\n- Visual Studio Code `1.10` or newer (or editors compatible with VS Code `1.10+` APIs)\n- [Entire CLI](github.com/entireio/cli) version `0.5.5` or newer\n\n## Using the extension\nSession Bridge works with any git repository that has [Entire](https://docs.entire.io/introduction) configured to capture your AI agent sessions. You don't need to be logged in to your [Entire](https://entire.io) account to view your sessions. \n\nOpen any Entire managed git repository and the `Session Bridge (Entire)` status bar will show at the bottom. \n\nSelect or open the installed Session Bridge extension to view your checkpoints.\n\n## Features\n\n- **Browse your committed checkpoints.**\n  ![Browse Checkpoints](media/demo/session-bridge-checkpoints.gif)\n\n- **View diffs of changes within a checkpoint.**\n  ![View Diffs](media/demo/session-bridge-view-diffs.gif)\n\n- **View sessions within a selected checkpoint.**\n  ![List Active Sessions](media/demo/session-bridge-list-sessions.gif)\n\n- **View details of a session.**\n  ![Session Details](media/demo/session-bridge-session-details.gif)\n\n- **View status of active sessions.**\n  ![Active Sessions Status](media/demo/session-bridge-sessions-status.png)\n\n- **Run [Entire CLI](github.com/entireio/cli) commands**\n\n## Known Issues\n\n - Some of the transcript might not be properly parsed.\n\n## Release Notes\n\n### 0.0.1\n\nInitial release",
+            "newContent": "# Session Bridge\n\n> This is an **unofficial** VS Code extension. It is not developed by, endorsed by, or in any way related to the [Entire](https://entire.io) team.\n\nSession Bridge is an unofficial VS Code extension for browsing [Entire](https://entire.io) checkpoints and the committed sessions captured in those checkpoints from the current repository.\n\n## Requirements\n- Visual Studio Code `1.10` or newer (or editors compatible with VS Code `1.10+` APIs)\n- [Entire CLI](github.com/entireio/cli) version `0.5.5` or newer\n\n## Using the extension\nSession Bridge works with any git repository that has [Entire](https://docs.entire.io/introduction) configured to capture your AI agent sessions. You don't need to be logged in to your [Entire](https://entire.io) account to view your sessions. \n\nOpen any Entire managed git repository and the `Session Bridge (Entire)` status bar will show at the bottom. \n\nSelect or open the installed Session Bridge extension to view your checkpoints.\n\n## Features\n\n- **Browse your committed checkpoints.**\n  ![Browse Checkpoints](media/demo/session-bridge-checkpoints.gif)\n\n- **View diffs of changes within a checkpoint.**\n  ![View Diffs](media/demo/session-bridge-view-diffs.gif)\n\n- **View sessions within a selected checkpoint.**\n  ![List Active Sessions](media/demo/session-bridge-list-sessions.gif)\n\n- **View details of a session.**\n  ![Session Details](media/demo/session-bridge-session-details.gif)\n\n- **View status of active sessions.**\n  ![Active Sessions Status](media/demo/session-bridge-sessions-status.png)\n\n- **Run [Entire CLI](github.com/entireio/cli) commands**\n\n## Known Issues\n\n - Some of the transcript might not be properly parsed.\n\n## Release Notes\n\n### 0.0.1\n\nInitial release\n\n## Contributing\n\nContributions are welcome! Please see our [Contribution Guide](CONTRIBUTING.md) for details on how to get started, coding standards, and our development workflow.",
+            "diffStat": {
+              "model_added_lines": 5,
+              "model_removed_lines": 1,
+              "model_added_chars": 192,
+              "model_removed_chars": 15,
+              "user_added_lines": 0,
+              "user_removed_lines": 0,
+              "user_added_chars": 0,
+              "user_removed_chars": 0
+            },
+            "isNewFile": false
+          },
+          "description": "README.md: ### 0.0.1 => ### 0.0.1...",
+          "displayName": "Edit",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "6a885abd-8c23-416c-98c9-0d880c742e65",
+      "timestamp": "2026-04-14T09:55:58.515Z",
+      "type": "gemini",
+      "content": "I will perform a final check of the file structure to confirm that the `CONTRIBUTING.md` and `README.md` updates have been correctly applied.",
+      "thoughts": [
+        {
+          "subject": "Reviewing File Structure",
+          "description": "Now I'm making sure everything is where it should be. The contribution guide is in place and the README points to it correctly. I'm taking a last look at all the files and folders, ensuring the project's organization is optimal.",
+          "timestamp": "2026-04-14T09:55:58.408Z"
+        }
+      ],
+      "tokens": {
+        "input": 25097,
+        "output": 44,
+        "cached": 24400,
+        "thoughts": 33,
+        "tool": 0,
+        "total": 25174
+      },
+      "model": "gemini-3-flash-preview",
+      "toolCalls": [
+        {
+          "id": "list_directory_1776160558514_0",
+          "name": "list_directory",
+          "args": {
+            "dir_path": "."
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "list_directory_1776160558514_0",
+                "name": "list_directory",
+                "response": {
+                  "output": "Directory listing for /Users/savekirk/dev/ai/entire/session-bridge:\n[DIR] .codex\n[DIR] .entire\n[DIR] .gemini\n[DIR] .github\n[DIR] .opencode\n[DIR] .vscode\n[DIR] .vscode-test\n[DIR] media\n[DIR] src\n.gitignore (50 bytes)\n.npmrc (30 bytes)\n.vscode-test.mjs (138 bytes)\n.vscodeignore (269 bytes)\nAGENTS.md (2889 bytes)\nCHANGELOG.md (1041 bytes)\nCONTRIBUTING.md (3817 bytes)\nesbuild.js (1175 bytes)\neslint.config.mjs (586 bytes)\nLICENSE.md (1072 bytes)\npackage.json (7358 bytes)\npnpm-lock.yaml (106836 bytes)\nREADME.md (1911 bytes)\ntsconfig.json (658 bytes)\nvsc-extension-quickstart.md (2895 bytes)\n\n(6 ignored)"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T09:55:58.574Z",
+          "resultDisplay": {
+            "summary": "Listed 24 item(s). (6 ignored)",
+            "files": [
+              "[DIR] .codex",
+              "[DIR] .entire",
+              "[DIR] .gemini",
+              "[DIR] .github",
+              "[DIR] .opencode",
+              "[DIR] .vscode",
+              "[DIR] .vscode-test",
+              "[DIR] media",
+              "[DIR] src",
+              ".gitignore",
+              ".npmrc",
+              ".vscode-test.mjs",
+              ".vscodeignore",
+              "AGENTS.md",
+              "CHANGELOG.md",
+              "CONTRIBUTING.md",
+              "esbuild.js",
+              "eslint.config.mjs",
+              "LICENSE.md",
+              "package.json",
+              "pnpm-lock.yaml",
+              "README.md",
+              "tsconfig.json",
+              "vsc-extension-quickstart.md"
+            ]
+          },
+          "description": ".",
+          "displayName": "ReadFolder",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "40ebb635-004d-4420-a8d0-54b27a4c093a",
+      "timestamp": "2026-04-14T09:56:02.111Z",
+      "type": "gemini",
+      "content": "I have created a comprehensive `CONTRIBUTING.md` guide and updated the `README.md` to link to it. The contribution guide includes detailed sections on:\n\n*   **Getting Started**: Prerequisites and installation steps.\n*   **Development Workflow**: Build, watch, and linting commands.\n*   **Project Structure**: Overview of the source code organization.\n*   **Coding Standards**: Language-specific style and naming conventions.\n*   **Testing**: Guidelines for writing and running tests.\n*   **Commits & Pull Requests**: Formatting rules and PR requirements.\n\nThe `README.md` now includes a new \"Contributing\" section pointing potential contributors to this guide.",
+      "thoughts": [
+        {
+          "subject": "Checking File Structure",
+          "description": "I've confirmed the placement of `CONTRIBUTING.md` and `README.md`. Now, I'm reviewing `AGENTS.md`, and considering its intended use for AI agents. The changes in the contributing file mean I need to ensure its contents align and that there's no duplication of information. I'll maintain `AGENTS.md` in its current state to ensure correct functionality.",
+          "timestamp": "2026-04-14T09:56:01.958Z"
+        },
+        {
+          "subject": "Analyzing Content Alignment",
+          "description": "Now that the file structure is verified, I'm assessing the content synergy between `CONTRIBUTING.md` and `README.md`. My primary aim is to avoid redundancy and ensure a clear, streamlined user experience. The AI agent's functionality hinges on `AGENTS.md` so it stays untouched. I've finished this stage of analysis.",
+          "timestamp": "2026-04-14T09:56:01.995Z"
+        }
+      ],
+      "tokens": {
+        "input": 25402,
+        "output": 142,
+        "cached": 24430,
+        "thoughts": 90,
+        "tool": 0,
+        "total": 25634
+      },
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "0ee77e18-8763-4e57-adac-60335531b96e",
+      "timestamp": "2026-04-14T10:01:44.834Z",
+      "type": "user",
+      "content": [
+        {
+          "text": "A change need to be discussed before submitting a pr"
+        }
+      ]
+    },
+    {
+      "id": "0bcbbc29-ecee-44eb-a7cd-085a19c171e4",
+      "timestamp": "2026-04-14T10:01:49.334Z",
+      "type": "gemini",
+      "content": "I will update `CONTRIBUTING.md` to include a requirement that all changes must be discussed before a pull request is submitted.",
+      "thoughts": [
+        {
+          "subject": "Revising Contributions Policy",
+          "description": "I'm now focusing on how to integrate the new constraint regarding discussing changes before submitting a pull request. I plan to incorporate this into both the `CONTRIBUTING.md` and the PR guidelines. I'll need to review the `CONTRIBUTING.md` file carefully to identify the most suitable placement for this crucial information.",
+          "timestamp": "2026-04-14T10:01:47.850Z"
+        },
+        {
+          "subject": "Adding Discussion Guidelines",
+          "description": "I've just finished the implementation of the new requirement, so now I'm working on the most effective placement for the new \"discuss changes first\" constraint. After reviewing the contributing guidelines, I'm leaning toward integrating it within the \"Pull Requests\" section. However, a new \"Discussion & Proposals\" section could also work. I will now examine the existing `CONTRIBUTING.md` to finalize the optimal placement and wording.",
+          "timestamp": "2026-04-14T10:01:48.881Z"
+        }
+      ],
+      "tokens": {
+        "input": 25554,
+        "output": 177,
+        "cached": 18679,
+        "thoughts": 134,
+        "tool": 0,
+        "total": 25865
+      },
+      "model": "gemini-3-flash-preview",
+      "toolCalls": [
+        {
+          "id": "replace_1776160909334_0",
+          "name": "replace",
+          "args": {
+            "file_path": "CONTRIBUTING.md",
+            "instruction": "Add a requirement to discuss changes before submitting a PR.",
+            "old_string": "### Pull Requests\n\n- Summarize the user-visible effect of the change.\n",
+            "new_string": "### Pull Requests\n\n**Important**: Before starting work on any significant change or submitting a pull request, please open a [discussion](https://github.com/savekirk/session-bridge/discussions) or an [issue](https://github.com/savekirk/session-bridge/issues) to discuss your proposal. This helps ensure your contribution aligns with the project's direction and avoids wasted effort.\n\n- Summarize the user-visible effect of the change.\n",
+            "allow_multiple": false
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "replace_1776160909334_0",
+                "name": "replace",
+                "response": {
+                  "output": "Successfully modified file: /Users/savekirk/dev/ai/entire/session-bridge/CONTRIBUTING.md (1 replacements). Here is the updated code:\n...\n- Use lightweight prefixes like `feat:`, `fix:`, `refactor:`, or `docs:`.\n- Focus on the **why** of the change rather than the process.\n\n### Pull Requests\n\n**Important**: Before starting work on any significant change or submitting a pull request, please open a [discussion](https://github.com/savekirk/session-bridge/discussions) or an [issue](https://github.com/savekirk/session-bridge/issues) to discuss your proposal. This helps ensure your contribution aligns with the project's direction and avoids wasted effort.\n\n- Summarize the user-visible effect of the change.\n- List the verification steps or commands run.\n- Link relevant issues if applicable.\n- **UI Changes**: Include screenshots or recordings if the PR modifies tree views, panels, or the status bar.\n\n..."
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T10:01:49.398Z",
+          "resultDisplay": {
+            "fileDiff": "Index: CONTRIBUTING.md\n===================================================================\n--- CONTRIBUTING.md\tCurrent\n+++ CONTRIBUTING.md\tProposed\n@@ -83,6 +83,8 @@\n \n ### Pull Requests\n \n+**Important**: Before starting work on any significant change or submitting a pull request, please open a [discussion](https://github.com/savekirk/session-bridge/discussions) or an [issue](https://github.com/savekirk/session-bridge/issues) to discuss your proposal. This helps ensure your contribution aligns with the project's direction and avoids wasted effort.\n+\n - Summarize the user-visible effect of the change.\n - List the verification steps or commands run.\n - Link relevant issues if applicable.\n",
+            "fileName": "CONTRIBUTING.md",
+            "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/CONTRIBUTING.md",
+            "originalContent": "# Contributing to Session Bridge\n\nThank you for your interest in contributing to Session Bridge! This guide will help you get started with the project and understand our development process.\n\n## Getting Started\n\n### Prerequisites\n\n- [Node.js](https://nodejs.org/) (latest LTS recommended)\n- [pnpm](https://pnpm.io/) for package management\n- [VS Code](https://code.visualstudio.com/) for development\n- [Entire CLI](https://github.com/entireio/cli) (v0.5.5 or newer) installed on your system\n\n### Installation\n\n1. Clone the repository:\n   ```bash\n   git clone https://github.com/savekirk/session-bridge.git\n   cd session-bridge\n   ```\n\n2. Install dependencies:\n   ```bash\n   pnpm install\n   ```\n\n## Development Workflow\n\n### Build Commands\n\nWe use `pnpm` for all development tasks. Key scripts include:\n\n- `pnpm compile`: Performs type-checking, linting, and bundles the extension into `dist/extension.js`.\n- `pnpm watch`: Runs esbuild and TypeScript in watch mode for local development.\n- `pnpm check-types`: Runs strict TypeScript checks only.\n- `pnpm lint`: Lints the `src/` directory using our ESLint configuration.\n- `pnpm package`: Builds the production bundle used for publishing.\n\n### Running the Extension Locally\n\n1. Open the project in VS Code.\n2. Press `F5` or go to the \"Run and Debug\" view and select \"Run Extension\".\n3. A new VS Code window (Extension Development Host) will open with the extension loaded.\n\n## Project Structure\n\n- `src/extension.ts`: Extension entry point, command registration, and view wiring.\n- `src/components/`: UI-facing providers and panels (Status Bar, Tree Views, Panels).\n- `src/checkpoints/`: Core domain logic for sessions, checkpoints, Git enrichment, and storage.\n- `src/test/`: Test suites, mirrored to the source structure.\n- `media/`: Extension icons and demo assets.\n- `dist/` and `out/`: Generated build and test outputs (ignored by Git).\n\n## Coding Standards\n\nWe follow strict TypeScript and specific formatting conventions:\n\n- **Indentation**: Use **tabs** for indentation.\n- **Quotes**: Use **single quotes** for imports and strings unless escaping is necessary.\n- **Semicolons**: Always use semicolons.\n- **Naming Conventions**:\n  - `PascalCase` for classes, providers, and exported types.\n  - `camelCase` for functions and local variables.\n  - `UPPER_SNAKE_CASE` for extension-wide constants.\n- **Namespacing**: Commands and context identifiers should be namespaced (e.g., `session.bridge.entire.refresh`).\n\n## Testing Guidelines\n\nEvery bug fix or new feature should include or update targeted tests.\n\n- **Location**: Write tests as `*.test.ts` under `src/test/`, mirroring the `src/` structure.\n- **Framework**: We use Mocha with `@vscode/test-cli`.\n- **Running Tests**: Run `pnpm test` to compile tests, rebuild the extension, and execute the VS Code test harness.\n- **Fixtures**: Prefer fixture-backed tests for complex logic like checkpoint parsing or Git metadata joins. Existing fixtures are located in `src/test/checkpoints/fixtures/`.\n\n## Commit and Pull Request Guidelines\n\n### Commit Messages\n\n- Use short, imperative subjects (e.g., `feat: add session search`).\n- Use lightweight prefixes like `feat:`, `fix:`, `refactor:`, or `docs:`.\n- Focus on the **why** of the change rather than the process.\n\n### Pull Requests\n\n- Summarize the user-visible effect of the change.\n- List the verification steps or commands run.\n- Link relevant issues if applicable.\n- **UI Changes**: Include screenshots or recordings if the PR modifies tree views, panels, or the status bar.\n\n## Reporting Issues\n\nUse the [GitHub Issues](https://github.com/savekirk/session-bridge/issues) page to report bugs or suggest features. When reporting a bug, please include:\n- A clear description of the issue.\n- Steps to reproduce.\n- Your OS and VS Code version.\n- Entire CLI version.\n",
+            "newContent": "# Contributing to Session Bridge\n\nThank you for your interest in contributing to Session Bridge! This guide will help you get started with the project and understand our development process.\n\n## Getting Started\n\n### Prerequisites\n\n- [Node.js](https://nodejs.org/) (latest LTS recommended)\n- [pnpm](https://pnpm.io/) for package management\n- [VS Code](https://code.visualstudio.com/) for development\n- [Entire CLI](https://github.com/entireio/cli) (v0.5.5 or newer) installed on your system\n\n### Installation\n\n1. Clone the repository:\n   ```bash\n   git clone https://github.com/savekirk/session-bridge.git\n   cd session-bridge\n   ```\n\n2. Install dependencies:\n   ```bash\n   pnpm install\n   ```\n\n## Development Workflow\n\n### Build Commands\n\nWe use `pnpm` for all development tasks. Key scripts include:\n\n- `pnpm compile`: Performs type-checking, linting, and bundles the extension into `dist/extension.js`.\n- `pnpm watch`: Runs esbuild and TypeScript in watch mode for local development.\n- `pnpm check-types`: Runs strict TypeScript checks only.\n- `pnpm lint`: Lints the `src/` directory using our ESLint configuration.\n- `pnpm package`: Builds the production bundle used for publishing.\n\n### Running the Extension Locally\n\n1. Open the project in VS Code.\n2. Press `F5` or go to the \"Run and Debug\" view and select \"Run Extension\".\n3. A new VS Code window (Extension Development Host) will open with the extension loaded.\n\n## Project Structure\n\n- `src/extension.ts`: Extension entry point, command registration, and view wiring.\n- `src/components/`: UI-facing providers and panels (Status Bar, Tree Views, Panels).\n- `src/checkpoints/`: Core domain logic for sessions, checkpoints, Git enrichment, and storage.\n- `src/test/`: Test suites, mirrored to the source structure.\n- `media/`: Extension icons and demo assets.\n- `dist/` and `out/`: Generated build and test outputs (ignored by Git).\n\n## Coding Standards\n\nWe follow strict TypeScript and specific formatting conventions:\n\n- **Indentation**: Use **tabs** for indentation.\n- **Quotes**: Use **single quotes** for imports and strings unless escaping is necessary.\n- **Semicolons**: Always use semicolons.\n- **Naming Conventions**:\n  - `PascalCase` for classes, providers, and exported types.\n  - `camelCase` for functions and local variables.\n  - `UPPER_SNAKE_CASE` for extension-wide constants.\n- **Namespacing**: Commands and context identifiers should be namespaced (e.g., `session.bridge.entire.refresh`).\n\n## Testing Guidelines\n\nEvery bug fix or new feature should include or update targeted tests.\n\n- **Location**: Write tests as `*.test.ts` under `src/test/`, mirroring the `src/` structure.\n- **Framework**: We use Mocha with `@vscode/test-cli`.\n- **Running Tests**: Run `pnpm test` to compile tests, rebuild the extension, and execute the VS Code test harness.\n- **Fixtures**: Prefer fixture-backed tests for complex logic like checkpoint parsing or Git metadata joins. Existing fixtures are located in `src/test/checkpoints/fixtures/`.\n\n## Commit and Pull Request Guidelines\n\n### Commit Messages\n\n- Use short, imperative subjects (e.g., `feat: add session search`).\n- Use lightweight prefixes like `feat:`, `fix:`, `refactor:`, or `docs:`.\n- Focus on the **why** of the change rather than the process.\n\n### Pull Requests\n\n**Important**: Before starting work on any significant change or submitting a pull request, please open a [discussion](https://github.com/savekirk/session-bridge/discussions) or an [issue](https://github.com/savekirk/session-bridge/issues) to discuss your proposal. This helps ensure your contribution aligns with the project's direction and avoids wasted effort.\n\n- Summarize the user-visible effect of the change.\n- List the verification steps or commands run.\n- Link relevant issues if applicable.\n- **UI Changes**: Include screenshots or recordings if the PR modifies tree views, panels, or the status bar.\n\n## Reporting Issues\n\nUse the [GitHub Issues](https://github.com/savekirk/session-bridge/issues) page to report bugs or suggest features. When reporting a bug, please include:\n- A clear description of the issue.\n- Steps to reproduce.\n- Your OS and VS Code version.\n- Entire CLI version.\n",
+            "diffStat": {
+              "model_added_lines": 2,
+              "model_removed_lines": 0,
+              "model_added_chars": 363,
+              "model_removed_chars": 0,
+              "user_added_lines": 0,
+              "user_removed_lines": 0,
+              "user_added_chars": 0,
+              "user_removed_chars": 0
+            },
+            "isNewFile": false
+          },
+          "description": "CONTRIBUTING.md: ### Pull Requests... => ### Pull Requests...",
+          "displayName": "Edit",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "0d14327a-ea18-432a-af6f-dca43f1432dc",
+      "timestamp": "2026-04-14T10:01:52.473Z",
+      "type": "gemini",
+      "content": "I've added the requirement to discuss changes before submission to `CONTRIBUTING.md`. The guide now explicitly advises contributors to open a discussion or issue first to ensure their proposals align with the project's goals.",
+      "thoughts": [],
+      "tokens": {
+        "input": 25948,
+        "output": 44,
+        "cached": 24867,
+        "thoughts": 0,
+        "tool": 0,
+        "total": 25992
+      },
+      "model": "gemini-3-flash-preview"
+    },
+    {
+      "id": "bcb90580-c9ad-4187-9fb5-a3496d66a57a",
+      "timestamp": "2026-04-14T10:08:26.090Z",
+      "type": "user",
+      "content": [
+        {
+          "text": "Add github issue template"
+        }
+      ]
+    },
+    {
+      "id": "f7049ced-570b-4ed0-b57a-516046137b41",
+      "timestamp": "2026-04-14T10:08:29.808Z",
+      "type": "gemini",
+      "content": "I will now explore the `.github` directory to determine if any issue templates already exist.",
+      "thoughts": [
+        {
+          "subject": "Analyzing Issue Templates",
+          "description": "I've located the `.github` directory and will be focusing my attention there. The next step involves reviewing the contents of the `.github` directory. After that, I will generate the standard templates requested.",
+          "timestamp": "2026-04-14T10:08:28.921Z"
+        },
+        {
+          "subject": "Reviewing GitHub Directory Content",
+          "description": "I'm now diving into the `.github` directory contents, focusing on potential existing issue templates. I'll determine the structure and layout to prepare the ground for custom templates. I will then move on to the actual creation of the bug report and feature request templates. Following that, I'll assess the need for a configuration file.",
+          "timestamp": "2026-04-14T10:08:29.721Z"
+        }
+      ],
+      "tokens": {
+        "input": 25996,
+        "output": 30,
+        "cached": 24971,
+        "thoughts": 169,
+        "tool": 0,
+        "total": 26195
+      },
+      "model": "gemini-3-flash-preview",
+      "toolCalls": [
+        {
+          "id": "list_directory_1776161309807_0",
+          "name": "list_directory",
+          "args": {
+            "dir_path": ".github"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "list_directory_1776161309807_0",
+                "name": "list_directory",
+                "response": {
+                  "output": "Directory listing for /Users/savekirk/dev/ai/entire/session-bridge/.github:\n[DIR] hooks"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T10:08:29.868Z",
+          "resultDisplay": {
+            "summary": "Listed 1 item(s).",
+            "files": [
+              "[DIR] hooks"
+            ]
+          },
+          "description": ".github",
+          "displayName": "ReadFolder",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "059292d2-2fcc-43ef-87b3-2303de195b92",
+      "timestamp": "2026-04-14T10:08:36.094Z",
+      "type": "gemini",
+      "content": "I'll create the `.github/ISSUE_TEMPLATE` directory and add standard templates for bug reports and feature requests.",
+      "thoughts": [],
+      "tokens": {
+        "input": 26052,
+        "output": 745,
+        "cached": 24839,
+        "thoughts": 0,
+        "tool": 0,
+        "total": 26797
+      },
+      "model": "gemini-3-flash-preview",
+      "toolCalls": [
+        {
+          "id": "write_file_1776161315763_0",
+          "name": "write_file",
+          "args": {
+            "file_path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+            "content": "name: Bug Report\ndescription: Report a bug to help us improve Session Bridge.\nlabels: [\"bug\"]\nbody:\n  - type: markdown\n    attributes:\n      value: |\n        Thank you for reporting a bug! Please fill out the information below to help us reproduce and fix it.\n  - type: textarea\n    id: description\n    attributes:\n      label: Description\n      placeholder: A clear and concise description of what the bug is.\n    validations:\n      required: true\n  - type: textarea\n    id: reproduction\n    attributes:\n      label: Steps to Reproduce\n      placeholder: |\n        1. Open a Git repository with Entire configured.\n        2. Click on ...\n        3. See error.\n    validations:\n      required: true\n  - type: textarea\n    id: expected\n    attributes:\n      label: Expected Behavior\n      placeholder: A clear and concise description of what you expected to happen.\n    validations:\n      required: true\n  - type: input\n    id: vscode-version\n    attributes:\n      label: VS Code Version\n      placeholder: e.g., 1.105.0\n    validations:\n      required: true\n  - type: input\n    id: os-version\n    attributes:\n      label: OS Version\n      placeholder: e.g., macOS 14.4, Windows 11, Ubuntu 22.04\n    validations:\n      required: true\n  - type: input\n    id: cli-version\n    attributes:\n      label: Entire CLI Version\n      placeholder: e.g., 0.5.5\n    validations:\n      required: true\n  - type: textarea\n    id: logs\n    attributes:\n      label: Relevant Logs\n      description: Please provide any relevant logs from the \"Session Bridge (Entire)\" output channel.\n      render: shell\n"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "write_file_1776161315763_0",
+                "name": "write_file",
+                "response": {
+                  "output": "Successfully created and wrote to new file: /Users/savekirk/dev/ai/entire/session-bridge/.github/ISSUE_TEMPLATE/bug_report.yml. Here is the updated code:\nname: Bug Report\ndescription: Report a bug to help us improve Session Bridge.\nlabels: [\"bug\"]\nbody:\n  - type: markdown\n    attributes:\n      value: |\n        Thank you for reporting a bug! Please fill out the information below to help us reproduce and fix it.\n  - type: textarea\n    id: description\n    attributes:\n      label: Description\n      placeholder: A clear and concise description of what the bug is.\n    validations:\n      required: true\n  - type: textarea\n    id: reproduction\n    attributes:\n      label: Steps to Reproduce\n      placeholder: |\n        1. Open a Git repository with Entire configured.\n        2. Click on ...\n        3. See error.\n    validations:\n      required: true\n  - type: textarea\n    id: expected\n    attributes:\n      label: Expected Behavior\n      placeholder: A clear and concise description of what you expected to happen.\n    validations:\n      required: true\n  - type: input\n    id: vscode-version\n    attributes:\n      label: VS Code Version\n      placeholder: e.g., 1.105.0\n    validations:\n      required: true\n  - type: input\n    id: os-version\n    attributes:\n      label: OS Version\n      placeholder: e.g., macOS 14.4, Windows 11, Ubuntu 22.04\n    validations:\n      required: true\n  - type: input\n    id: cli-version\n    attributes:\n      label: Entire CLI Version\n      placeholder: e.g., 0.5.5\n    validations:\n      required: true\n  - type: textarea\n    id: logs\n    attributes:\n      label: Relevant Logs\n      description: Please provide any relevant logs from the \"Session Bridge (Entire)\" output channel.\n      render: shell\n"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T10:08:36.216Z",
+          "resultDisplay": {
+            "fileDiff": "Index: bug_report.yml\n===================================================================\n--- bug_report.yml\tOriginal\n+++ bug_report.yml\tWritten\n@@ -0,0 +1,59 @@\n+name: Bug Report\n+description: Report a bug to help us improve Session Bridge.\n+labels: [\"bug\"]\n+body:\n+  - type: markdown\n+    attributes:\n+      value: |\n+        Thank you for reporting a bug! Please fill out the information below to help us reproduce and fix it.\n+  - type: textarea\n+    id: description\n+    attributes:\n+      label: Description\n+      placeholder: A clear and concise description of what the bug is.\n+    validations:\n+      required: true\n+  - type: textarea\n+    id: reproduction\n+    attributes:\n+      label: Steps to Reproduce\n+      placeholder: |\n+        1. Open a Git repository with Entire configured.\n+        2. Click on ...\n+        3. See error.\n+    validations:\n+      required: true\n+  - type: textarea\n+    id: expected\n+    attributes:\n+      label: Expected Behavior\n+      placeholder: A clear and concise description of what you expected to happen.\n+    validations:\n+      required: true\n+  - type: input\n+    id: vscode-version\n+    attributes:\n+      label: VS Code Version\n+      placeholder: e.g., 1.105.0\n+    validations:\n+      required: true\n+  - type: input\n+    id: os-version\n+    attributes:\n+      label: OS Version\n+      placeholder: e.g., macOS 14.4, Windows 11, Ubuntu 22.04\n+    validations:\n+      required: true\n+  - type: input\n+    id: cli-version\n+    attributes:\n+      label: Entire CLI Version\n+      placeholder: e.g., 0.5.5\n+    validations:\n+      required: true\n+  - type: textarea\n+    id: logs\n+    attributes:\n+      label: Relevant Logs\n+      description: Please provide any relevant logs from the \"Session Bridge (Entire)\" output channel.\n+      render: shell\n",
+            "fileName": "bug_report.yml",
+            "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/.github/ISSUE_TEMPLATE/bug_report.yml",
+            "originalContent": "",
+            "newContent": "name: Bug Report\ndescription: Report a bug to help us improve Session Bridge.\nlabels: [\"bug\"]\nbody:\n  - type: markdown\n    attributes:\n      value: |\n        Thank you for reporting a bug! Please fill out the information below to help us reproduce and fix it.\n  - type: textarea\n    id: description\n    attributes:\n      label: Description\n      placeholder: A clear and concise description of what the bug is.\n    validations:\n      required: true\n  - type: textarea\n    id: reproduction\n    attributes:\n      label: Steps to Reproduce\n      placeholder: |\n        1. Open a Git repository with Entire configured.\n        2. Click on ...\n        3. See error.\n    validations:\n      required: true\n  - type: textarea\n    id: expected\n    attributes:\n      label: Expected Behavior\n      placeholder: A clear and concise description of what you expected to happen.\n    validations:\n      required: true\n  - type: input\n    id: vscode-version\n    attributes:\n      label: VS Code Version\n      placeholder: e.g., 1.105.0\n    validations:\n      required: true\n  - type: input\n    id: os-version\n    attributes:\n      label: OS Version\n      placeholder: e.g., macOS 14.4, Windows 11, Ubuntu 22.04\n    validations:\n      required: true\n  - type: input\n    id: cli-version\n    attributes:\n      label: Entire CLI Version\n      placeholder: e.g., 0.5.5\n    validations:\n      required: true\n  - type: textarea\n    id: logs\n    attributes:\n      label: Relevant Logs\n      description: Please provide any relevant logs from the \"Session Bridge (Entire)\" output channel.\n      render: shell\n",
+            "diffStat": {
+              "model_added_lines": 59,
+              "model_removed_lines": 0,
+              "model_added_chars": 1525,
+              "model_removed_chars": 0,
+              "user_added_lines": 0,
+              "user_removed_lines": 0,
+              "user_added_chars": 0,
+              "user_removed_chars": 0
+            },
+            "isNewFile": true
+          },
+          "description": "Writing to .github/.../bug_report.yml",
+          "displayName": "WriteFile",
+          "renderOutputAsMarkdown": true
+        },
+        {
+          "id": "write_file_1776161316093_1",
+          "name": "write_file",
+          "args": {
+            "file_path": ".github/ISSUE_TEMPLATE/feature_request.yml",
+            "content": "name: Feature Request\ndescription: Suggest a new feature or improvement for Session Bridge.\nlabels: [\"enhancement\"]\nbody:\n  - type: markdown\n    attributes:\n      value: |\n        Thank you for suggesting a feature! Please provide as much detail as possible to help us understand your proposal.\n  - type: textarea\n    id: problem\n    attributes:\n      label: Is your feature request related to a problem?\n      placeholder: A clear and concise description of what the problem is.\n    validations:\n      required: true\n  - type: textarea\n    id: solution\n    attributes:\n      label: Describe the solution you'd like\n      placeholder: A clear and concise description of what you want to happen.\n    validations:\n      required: true\n  - type: textarea\n    id: alternatives\n    attributes:\n      label: Describe alternatives you've considered\n      placeholder: Any alternative solutions or features you've considered.\n  - type: textarea\n    id: additional\n    attributes:\n      label: Additional Context\n      placeholder: Add any other context or screenshots about the feature request here.\n"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "write_file_1776161316093_1",
+                "name": "write_file",
+                "response": {
+                  "output": "Successfully created and wrote to new file: /Users/savekirk/dev/ai/entire/session-bridge/.github/ISSUE_TEMPLATE/feature_request.yml. Here is the updated code:\nname: Feature Request\ndescription: Suggest a new feature or improvement for Session Bridge.\nlabels: [\"enhancement\"]\nbody:\n  - type: markdown\n    attributes:\n      value: |\n        Thank you for suggesting a feature! Please provide as much detail as possible to help us understand your proposal.\n  - type: textarea\n    id: problem\n    attributes:\n      label: Is your feature request related to a problem?\n      placeholder: A clear and concise description of what the problem is.\n    validations:\n      required: true\n  - type: textarea\n    id: solution\n    attributes:\n      label: Describe the solution you'd like\n      placeholder: A clear and concise description of what you want to happen.\n    validations:\n      required: true\n  - type: textarea\n    id: alternatives\n    attributes:\n      label: Describe alternatives you've considered\n      placeholder: Any alternative solutions or features you've considered.\n  - type: textarea\n    id: additional\n    attributes:\n      label: Additional Context\n      placeholder: Add any other context or screenshots about the feature request here.\n"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-04-14T10:08:36.216Z",
+          "resultDisplay": {
+            "fileDiff": "Index: feature_request.yml\n===================================================================\n--- feature_request.yml\tOriginal\n+++ feature_request.yml\tWritten\n@@ -0,0 +1,32 @@\n+name: Feature Request\n+description: Suggest a new feature or improvement for Session Bridge.\n+labels: [\"enhancement\"]\n+body:\n+  - type: markdown\n+    attributes:\n+      value: |\n+        Thank you for suggesting a feature! Please provide as much detail as possible to help us understand your proposal.\n+  - type: textarea\n+    id: problem\n+    attributes:\n+      label: Is your feature request related to a problem?\n+      placeholder: A clear and concise description of what the problem is.\n+    validations:\n+      required: true\n+  - type: textarea\n+    id: solution\n+    attributes:\n+      label: Describe the solution you'd like\n+      placeholder: A clear and concise description of what you want to happen.\n+    validations:\n+      required: true\n+  - type: textarea\n+    id: alternatives\n+    attributes:\n+      label: Describe alternatives you've considered\n+      placeholder: Any alternative solutions or features you've considered.\n+  - type: textarea\n+    id: additional\n+    attributes:\n+      label: Additional Context\n+      placeholder: Add any other context or screenshots about the feature request here.\n",
+            "fileName": "feature_request.yml",
+            "filePath": "/Users/savekirk/dev/ai/entire/session-bridge/.github/ISSUE_TEMPLATE/feature_request.yml",
+            "originalContent": "",
+            "newContent": "name: Feature Request\ndescription: Suggest a new feature or improvement for Session Bridge.\nlabels: [\"enhancement\"]\nbody:\n  - type: markdown\n    attributes:\n      value: |\n        Thank you for suggesting a feature! Please provide as much detail as possible to help us understand your proposal.\n  - type: textarea\n    id: problem\n    attributes:\n      label: Is your feature request related to a problem?\n      placeholder: A clear and concise description of what the problem is.\n    validations:\n      required: true\n  - type: textarea\n    id: solution\n    attributes:\n      label: Describe the solution you'd like\n      placeholder: A clear and concise description of what you want to happen.\n    validations:\n      required: true\n  - type: textarea\n    id: alternatives\n    attributes:\n      label: Describe alternatives you've considered\n      placeholder: Any alternative solutions or features you've considered.\n  - type: textarea\n    id: additional\n    attributes:\n      label: Additional Context\n      placeholder: Add any other context or screenshots about the feature request here.\n",
+            "diffStat": {
+              "model_added_lines": 32,
+              "model_removed_lines": 0,
+              "model_added_chars": 1060,
+              "model_removed_chars": 0,
+              "user_added_lines": 0,
+              "user_removed_lines": 0,
+              "user_added_chars": 0,
+              "user_removed_chars": 0
+            },
+            "isNewFile": true
+          },
+          "description": "Writing to .github/.../feature_request.yml",
+          "displayName": "WriteFile",
+          "renderOutputAsMarkdown": true
+        }
+      ]
+    },
+    {
+      "id": "93326e1f-a29d-40c7-8d5f-99867284e325",
+      "timestamp": "2026-04-14T10:08:39.017Z",
+      "type": "gemini",
+      "content": "I've added GitHub Issue Forms for both Bug Reports and Feature Requests. These templates are designed to ensure consistent and high-quality submissions by prompting users for specific information such as VS Code versions, reproduction steps, and expected behavior.\n\nYou can find the new templates at:\n*   `.github/ISSUE_TEMPLATE/bug_report.yml`\n*   `.github/ISSUE_TEMPLATE/feature_request.yml`",
+      "thoughts": [],
+      "tokens": {
+        "input": 27557,
+        "output": 89,
+        "cached": 25129,
+        "thoughts": 0,
+        "tool": 0,
+        "total": 27646
+      },
+      "model": "gemini-3-flash-preview"
+    }
+  ],
+  "kind": "main"
+}

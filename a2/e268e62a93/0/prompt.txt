@@ -1,0 +1,9 @@
+Add a contribution guide
+
+---
+
+A change need to be discussed before submitting a pr
+
+---
+
+Add github issue template

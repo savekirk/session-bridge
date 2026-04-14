@@ -18,19 +18,19 @@ Select or open the installed Session Bridge extension to view your checkpoints.
 ## Features
 
 - **Browse your committed checkpoints.**
-  ![Browse Checkpoints](media/demo/session-bridge-checkpoints.gif)
+  ![Browse Checkpoints](docs/assets/checkpoints.gif)
 
 - **View diffs of changes within a checkpoint.**
-  ![View Diffs](media/demo/session-bridge-view-diffs.gif)
+  ![View Diffs](docs/assets/view-diffs.gif)
 
 - **View sessions within a selected checkpoint.**
-  ![List Active Sessions](media/demo/session-bridge-list-sessions.gif)
+  ![List Sessions](docs/assets/sessions.gif)
 
 - **View details of a session.**
-  ![Session Details](media/demo/session-bridge-session-details.gif)
+  ![Session Details](docs/assets/session-details.gif)
 
 - **View status of active sessions.**
-  ![Active Sessions Status](media/demo/session-bridge-sessions-status.png)
+  ![Active Sessions Status](docs/assets/active-sessions.gif)
 
 - **Run [Entire CLI](github.com/entireio/cli) commands**
 
@@ -43,3 +43,7 @@ Select or open the installed Session Bridge extension to view your checkpoints.
 ### 0.0.1
 
 Initial release
+
+## Contributing
+
+Contributions are welcome! Please see our [Contribution Guide](CONTRIBUTING.md) for details on how to get started, coding standards, and our development workflow.
